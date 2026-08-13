@@ -487,16 +487,16 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0 overflow-hidden">
         {/* Sticky Top Header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 sm:px-6 py-2.5 shadow-xs flex items-center justify-between gap-3">
-          {/* Left: Menu Toggle, Logo & Title */}
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-3 sm:px-5 py-2 shadow-xs flex items-center justify-between gap-2 sm:gap-4">
+          {/* Left: Menu Toggle + Logo */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
             <button
               onClick={() => setSidebarOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:text-[#0A2E24] hover:bg-gray-100 transition-colors shadow-2xs font-bold text-xs shrink-0"
+              className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border border-gray-200 text-gray-700 hover:text-[#0A2E24] hover:bg-gray-100 transition-colors shadow-2xs font-bold text-xs shrink-0"
               aria-label="Toggle navigation menu"
             >
               <Menu className="w-5 h-5 text-[#0A2E24]" />
-              <span className="font-sans text-xs font-bold">Menu</span>
+              <span className="hidden md:inline font-sans text-xs font-bold">Menu</span>
             </button>
 
             {/* EPA AEC Logo Badge in Dashboard Header */}
@@ -510,43 +510,33 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
               </div>
             </Link>
 
-            <div className="flex items-center gap-2 truncate">
-              {role === 'admin' ? (
-                <span className="hidden md:inline-flex items-center gap-1.5 text-xs bg-[#0A2E24] text-[#D4AF37] px-2.5 py-1 rounded-lg font-mono font-bold shadow-xs shrink-0">
-                  <ShieldAlert className="w-3.5 h-3.5" /> EPA ADMIN
-                </span>
-              ) : (
-                <span className="hidden md:inline-flex items-center gap-1.5 text-xs bg-[#1A4A3A] text-[#D4AF37] px-2.5 py-1 rounded-lg font-mono font-bold shadow-xs shrink-0">
-                  <UserCheck className="w-3.5 h-3.5" /> CLIENT PORTAL
-                </span>
-              )}
-              <div className="truncate">
-                <h1 className="font-heading font-extrabold text-xs sm:text-sm md:text-base text-[#0A2E24] truncate leading-tight">
-                  {role === 'admin'
-                    ? 'Liberia EPA Compliance Hub'
-                    : proponent?.company_name || 'Client Compliance Portal'}
-                </h1>
-                <p className="text-[10px] text-gray-500 font-mono truncate hidden sm:block">
-                  {getBreadcrumbLabel()}
-                </p>
-              </div>
-            </div>
+            {role === 'admin' ? (
+              <span className="hidden lg:inline-flex items-center gap-1.5 text-[11px] bg-[#0A2E24] text-[#D4AF37] px-2.5 py-1 rounded-lg font-mono font-bold shadow-xs shrink-0">
+                <ShieldAlert className="w-3.5 h-3.5" /> EPA ADMIN
+              </span>
+            ) : (
+              <span className="hidden lg:inline-flex items-center gap-1.5 text-[11px] bg-[#1A4A3A] text-[#D4AF37] px-2.5 py-1 rounded-lg font-mono font-bold shadow-xs shrink-0">
+                <UserCheck className="w-3.5 h-3.5" /> CLIENT PORTAL
+              </span>
+            )}
           </div>
 
-          {/* Right: Quick Search, Quick Action, Notifications, User Menu */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Quick Search Button Header */}
+          {/* Center: Search (flex-1, hidden on mobile) */}
+          <div className="hidden sm:flex flex-1 items-center justify-center min-w-0 px-2 lg:px-6">
             <button
               onClick={() => setSearchModalOpen(true)}
-              className="hidden sm:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg border border-gray-200 transition-colors"
+              className="flex items-center gap-2 w-full max-w-lg min-w-0 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg border border-gray-200 transition-colors"
             >
-              <Search className="w-3.5 h-3.5 text-[#0A2E24]" />
-              <span>Search permits or pages...</span>
-              <span className="font-mono text-[9px] bg-white text-gray-600 px-1 py-0.2 rounded border border-gray-300">
+              <Search className="w-3.5 h-3.5 text-[#0A2E24] shrink-0" />
+              <span className="truncate">Search permits or pages...</span>
+              <span className="font-mono text-[9px] bg-white text-gray-600 px-1.5 py-0.5 rounded border border-gray-300 shrink-0 ml-auto">
                 /
               </span>
             </button>
+          </div>
 
+          {/* Right: Quick Action, Notifications, Profile */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Quick Action Button Dropdown */}
             <div className="relative">
               <button

@@ -67,7 +67,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
         className={
           isDark
             ? 'px-3.5 py-1.5 rounded-xl border border-[#D4AF37] bg-[#1A4A3A]/80 hover:bg-[#1A4A3A] text-white transition-all flex items-center gap-2 shadow-md group'
-            : 'px-3 py-1.5 rounded-xl border border-gray-200 hover:border-[#0A2E24] bg-gray-50/80 hover:bg-gray-100 transition-all shadow-2xs group'
+            : 'px-3 py-1.5 rounded-xl border border-gray-200 hover:border-[#0A2E24] bg-gray-50/80 hover:bg-gray-100 transition-all shadow-2xs flex items-center gap-2 group'
         }
       >
         <div
@@ -84,19 +84,10 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
             className={
               isDark
                 ? 'font-bold text-[#D4AF37] block leading-tight'
-                : 'text-xs font-extrabold text-[#0A2E24] leading-tight'
+                : 'text-xs font-extrabold text-[#0A2E24] truncate max-w-[110px] leading-none block'
             }
           >
-            Profile
-          </span>
-          <span
-            className={
-              isDark
-                ? 'text-[10px] text-gray-300 font-mono block leading-none'
-                : 'text-[10px] text-gray-500 font-mono truncate max-w-[100px] leading-tight block'
-            }
-          >
-            {user?.full_name?.split(' ')[0] || 'Account'}
+            {isDark ? 'Profile' : user?.full_name?.split(' ')[0] || 'Profile'}
           </span>
         </div>
         <ChevronDown
