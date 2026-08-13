@@ -184,31 +184,6 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
 
   const navGroups = role === 'admin' ? adminNavGroups : clientNavGroups;
 
-  const topNavLinks = role === 'admin'
-    ? [
-        { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-        { name: 'Proponents', path: '/admin/proponents', icon: Building2 },
-        { name: 'Permits', path: '/admin/permits', icon: FileCheck },
-        { name: 'Schedules', path: '/admin/schedules', icon: CalendarClock },
-        { name: 'Findings', path: '/admin/findings', icon: AlertTriangle },
-        { name: 'Evidence', path: '/admin/evidence', icon: Upload },
-        { name: 'Requests', path: '/admin/requests', icon: FileText },
-        { name: 'Bookings', path: '/admin/bookings', icon: Calendar },
-        { name: 'Logs', path: '/admin/logs', icon: History },
-        { name: 'Settings', path: '/admin/settings', icon: Settings },
-      ]
-    : [
-        { name: 'Dashboard', path: '/portal', icon: LayoutDashboard },
-        { name: 'Company', path: '/portal/company', icon: Building2 },
-        { name: 'My Permits', path: '/portal/permits', icon: FileCheck },
-        { name: 'Schedules', path: '/portal/schedules', icon: CalendarClock },
-        { name: 'Findings', path: '/portal/findings', icon: AlertTriangle },
-        { name: 'Evidence', path: '/portal/evidence', icon: Upload },
-        { name: 'Reminders', path: '/portal/reminders', icon: BellRing },
-        { name: 'Book Session', path: '/portal/book', icon: Calendar },
-        { name: 'Support', path: '/portal/support', icon: HelpCircle },
-      ];
-
   // Mobile Bottom Navigation Bar Items (4 key links + Menu trigger)
   const mobileBottomNav = role === 'admin' ? [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -750,31 +725,6 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
               onLogout={handleSignOut}
             />
           </div>
-
-          {/* Horizontal Module Navigation Bar */}
-          <nav className="bg-[#0A2E24] text-white px-4 sm:px-6 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-[#D4AF37]/30 shadow-inner">
-            <span className="text-[10px] font-mono font-bold uppercase text-[#D4AF37] pr-2 shrink-0 border-r border-white/10 hidden sm:inline-block">
-              {role === 'admin' ? 'Admin Navigation' : 'Client Navigation'}
-            </span>
-            {topNavLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = location.pathname === link.path;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
-                    isActive
-                      ? 'bg-[#D4AF37] text-[#0A2E24] font-bold shadow-xs scale-105'
-                      : 'text-gray-200 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5 text-[#D4AF37]" />
-                  <span>{link.name}</span>
-                </Link>
-              );
-            })}
-          </nav>
         </header>
 
         {/* Sub-Header Breadcrumbs Bar */}
