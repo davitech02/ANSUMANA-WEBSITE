@@ -1,0 +1,1018 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  Building2,
+  FileCheck,
+  CalendarClock,
+  AlertTriangle,
+  Upload,
+  MessageSquare,
+  Calendar,
+  History,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  ExternalLink,
+  ShieldAlert,
+  UserCheck,
+  ChevronDown,
+  BellRing,
+  Search,
+  Plus,
+  ChevronRight,
+  Command,
+  CheckCircle2,
+  Sparkles,
+  Mail,
+  HelpCircle,
+  PhoneCall,
+  FileText,
+} from 'lucide-react';
+import { useAuth } from '../../lib/AuthContext';
+import { getStorageData, StorageData } from '../../lib/storage';
+import { ProfileMenu } from '../common/ProfileMenu';
+
+const LOGO_URL =
+  'https://media.base44.com/images/public/6a41d19b1eb6cd6bf679b527/c2b37abf0_ChatGPTImageJul28202601_07_19AM.png';
+
+interface PortalLayoutProps {
+  role?: 'admin' | 'client';
+}
+
+export const PortalLayout: React.FC<PortalLayoutProps> = () => {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [quickActionOpen, setQuickActionOpen] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [storageData, setStorageData] = useState<StorageData>(() => getStorageData());
+  const [showToastBanner, setShowToastBanner] = useState(true);
+
+  const { user, proponent, logout, switchRole } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isSectionAdmin = location.pathname.startsWith('/admin');
+  const role = isSectionAdmin ? 'admin' : (location.pathname.startsWith('/portal') ? 'client' : (user?.role === 'admin' ? 'admin' : 'client'));
+
+  // Listen to storage changes for live badge updates
+  useEffect(() => {
+    const handleUpdate = () => setStorageData(getStorageData());
+    window.addEventListener('aec_storage_updated', handleUpdate);
+    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+  }, []);
+
+  // Keyboard shortcut Ctrl+K / Cmd+K for command palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Calculate badge numbers
+  const badges = useMemo(() => {
+    const pId = proponent?.id;
+
+    if (role === 'admin') {
+      const activeProponents = storageData.proponents.length;
+      const criticalPermits = storageData.permits.filter(
+        (p) => p.permit_status === 'Expired' || p.permit_status === 'Pending Renewal'
+      ).length;
+      const pendingSchedules = storageData.schedules.filter(
+        (s) => s.status === 'Overdue' || s.status === 'Pending'
+      ).length;
+      const openFindings = storageData.findings.filter((f) => f.action_status === 'Open').length;
+      const pendingEvidence = storageData.evidence.filter((e) => e.review_status === 'Pending review').length;
+      const pendingRequests = storageData.requests.filter((r) => r.status === 'New').length;
+      const upcomingBookings = storageData.bookings.filter((b) => b.booking_status === 'Confirmed').length;
+
+      return {
+        proponents: activeProponents,
+        permits: criticalPermits > 0 ? criticalPermits : undefined,
+        schedules: pendingSchedules > 0 ? pendingSchedules : undefined,
+        findings: openFindings > 0 ? openFindings : undefined,
+        evidence: pendingEvidence > 0 ? pendingEvidence : undefined,
+        requests: pendingRequests > 0 ? pendingRequests : undefined,
+        bookings: upcomingBookings > 0 ? upcomingBookings : undefined,
+      };
+    } else {
+      // Client role badges
+      const myPermits = storageData.permits.filter((p) => p.proponent_id === pId).length;
+      const myDeadlines = storageData.schedules.filter(
+        (s) => s.proponent_id === pId && (s.status === 'Pending' || s.status === 'Overdue')
+      ).length;
+      const myFindings = storageData.findings.filter(
+        (f) => f.proponent_id === pId && f.action_status === 'Open'
+      ).length;
+      const myEvidence = storageData.evidence.filter(
+        (e) => e.proponent_id === pId && e.review_status === 'Pending review'
+      ).length;
+
+      return {
+        permits: myPermits,
+        schedules: myDeadlines > 0 ? myDeadlines : undefined,
+        findings: myFindings > 0 ? myFindings : undefined,
+        evidence: myEvidence > 0 ? myEvidence : undefined,
+      };
+    }
+  }, [storageData, role, proponent]);
+
+  // Grouped Navigation Items matching reference image
+  const adminNavGroups = [
+    {
+      groupTitle: 'MENU',
+      items: [
+        { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+        { name: 'Proponent Companies', path: '/admin/proponents', icon: Building2, badge: badges.proponents },
+        { name: 'EPA Permits', path: '/admin/permits', icon: FileCheck, badge: badges.permits, badgeColor: 'bg-amber-500' },
+        { name: 'Report Schedules', path: '/admin/schedules', icon: CalendarClock, badge: badges.schedules, badgeColor: 'bg-red-500' },
+        { name: 'Findings & Actions', path: '/admin/findings', icon: AlertTriangle, badge: badges.findings, badgeColor: 'bg-red-500' },
+        { name: 'Evidence Review', path: '/admin/evidence', icon: Upload, badge: badges.evidence, badgeColor: 'bg-blue-500' },
+        { name: 'Client Requests', path: '/admin/requests', icon: FileText, badge: badges.requests, badgeColor: 'bg-purple-500' },
+        { name: 'Session Bookings', path: '/admin/bookings', icon: Calendar, badge: badges.bookings, badgeColor: 'bg-emerald-500' },
+      ],
+    },
+    {
+      groupTitle: 'SYSTEM & LOGS',
+      items: [
+        { name: 'Audit Trail Logs', path: '/admin/logs', icon: History },
+        { name: 'Email Dispatch Logs', path: '/admin/email-logs', icon: Mail },
+        { name: 'WhatsApp Logs', path: '/admin/whatsapp-logs', icon: MessageSquare },
+        { name: 'System Settings', path: '/admin/settings', icon: Settings },
+      ],
+    },
+    {
+      groupTitle: 'SUPPORT',
+      items: [
+        { name: 'Support Helpdesk', path: '/admin/support', icon: HelpCircle },
+        { name: 'Contact AEC', path: '/admin/contact', icon: PhoneCall },
+      ],
+    },
+  ];
+
+  const clientNavGroups = [
+    {
+      groupTitle: 'MENU',
+      items: [
+        { name: 'Dashboard', path: '/portal', icon: LayoutDashboard },
+        { name: 'Company Profile', path: '/portal/company', icon: Building2 },
+        { name: 'My EPA Permits', path: '/portal/permits', icon: FileCheck, badge: badges.permits },
+        { name: 'Report Schedules', path: '/portal/schedules', icon: CalendarClock, badge: badges.schedules, badgeColor: 'bg-red-500' },
+        { name: 'Non-Compliance Findings', path: '/portal/findings', icon: AlertTriangle, badge: badges.findings, badgeColor: 'bg-red-500' },
+        { name: 'Evidence Uploads', path: '/portal/evidence', icon: Upload, badge: badges.evidence, badgeColor: 'bg-blue-500' },
+        { name: 'Book Advisory Session', path: '/portal/book', icon: Calendar },
+        { name: 'Reminders & Alerts', path: '/portal/reminders', icon: BellRing },
+      ],
+    },
+    {
+      groupTitle: 'SUPPORT',
+      items: [
+        { name: 'Support & Helpdesk', path: '/portal/support', icon: HelpCircle },
+        { name: 'Contact AEC', path: '/portal/contact', icon: PhoneCall },
+      ],
+    },
+  ];
+
+  const navGroups = role === 'admin' ? adminNavGroups : clientNavGroups;
+
+  const topNavLinks = role === 'admin'
+    ? [
+        { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+        { name: 'Proponents', path: '/admin/proponents', icon: Building2 },
+        { name: 'Permits', path: '/admin/permits', icon: FileCheck },
+        { name: 'Schedules', path: '/admin/schedules', icon: CalendarClock },
+        { name: 'Findings', path: '/admin/findings', icon: AlertTriangle },
+        { name: 'Evidence', path: '/admin/evidence', icon: Upload },
+        { name: 'Requests', path: '/admin/requests', icon: FileText },
+        { name: 'Bookings', path: '/admin/bookings', icon: Calendar },
+        { name: 'Logs', path: '/admin/logs', icon: History },
+        { name: 'Settings', path: '/admin/settings', icon: Settings },
+      ]
+    : [
+        { name: 'Dashboard', path: '/portal', icon: LayoutDashboard },
+        { name: 'Company', path: '/portal/company', icon: Building2 },
+        { name: 'My Permits', path: '/portal/permits', icon: FileCheck },
+        { name: 'Schedules', path: '/portal/schedules', icon: CalendarClock },
+        { name: 'Findings', path: '/portal/findings', icon: AlertTriangle },
+        { name: 'Evidence', path: '/portal/evidence', icon: Upload },
+        { name: 'Reminders', path: '/portal/reminders', icon: BellRing },
+        { name: 'Book Session', path: '/portal/book', icon: Calendar },
+        { name: 'Support', path: '/portal/support', icon: HelpCircle },
+      ];
+
+  // Mobile Bottom Navigation Bar Items (4 key links + Menu trigger)
+  const mobileBottomNav = role === 'admin' ? [
+    { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+    { name: 'Proponents', path: '/admin/proponents', icon: Building2 },
+    { name: 'Permits', path: '/admin/permits', icon: FileCheck, badge: badges.permits },
+    { name: 'Schedules', path: '/admin/schedules', icon: CalendarClock, badge: badges.schedules },
+  ] : [
+    { name: 'Dashboard', path: '/portal', icon: LayoutDashboard },
+    { name: 'Permits', path: '/portal/permits', icon: FileCheck },
+    { name: 'Deadlines', path: '/portal/schedules', icon: CalendarClock, badge: badges.schedules },
+    { name: 'Uploads', path: '/portal/evidence', icon: Upload, badge: badges.evidence },
+  ];
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Build current breadcrumb route label
+  const getBreadcrumbLabel = () => {
+    const p = location.pathname;
+    if (p === '/admin') return 'Admin Compliance Center';
+    if (p === '/admin/proponents') return 'Proponent Companies';
+    if (p === '/admin/permits') return 'EPA Permits Management';
+    if (p === '/admin/schedules') return 'Report Schedules & Countdowns';
+    if (p === '/admin/findings') return 'Non-Compliance Findings & Corrective Actions';
+    if (p === '/admin/evidence') return 'Evidence Review & Field Verification';
+    if (p === '/admin/requests') return 'Client Service Requests';
+    if (p === '/admin/bookings') return 'Advisory Session Bookings';
+    if (p === '/admin/logs') return 'Notification Audit Logs';
+    if (p === '/admin/email-logs') return 'Email Dispatch Audit Trail';
+    if (p === '/admin/whatsapp-logs') return 'WhatsApp Alert Audit Logs';
+    if (p === '/admin/settings') return 'AEC System Settings';
+
+    if (p === '/portal') return 'Client Dashboard';
+    if (p === '/portal/company') return 'Company Profile & Info';
+    if (p === '/portal/permits') return 'My EPA Permits';
+    if (p === '/portal/schedules') return 'Report Schedules & Deadlines';
+    if (p === '/portal/findings') return 'My Non-Compliance Findings';
+    if (p === '/portal/evidence') return 'Evidence Uploads';
+    if (p === '/portal/book') return 'Book Advisory Session';
+    if (p === '/portal/reminders') return 'Reminders & Notifications';
+    if (p === '/portal/support') return 'EPA Statutory Help & Support';
+    if (p === '/portal/contact') return 'Contact AEC Headquarters';
+
+    return 'Compliance Portal';
+  };
+
+  // Notifications for bell popover
+  const recentLogs = storageData.logs.slice(0, 5);
+
+  const upcomingSessionsList = useMemo(() => {
+    return storageData.bookings.filter((b) => b.booking_status === 'Confirmed');
+  }, [storageData.bookings]);
+
+  const expiringPermitsList = useMemo(() => {
+    return storageData.permits.filter(
+      (p) =>
+        p.permit_status === 'Expired' ||
+        p.permit_status === 'Pending Renewal'
+    );
+  }, [storageData.permits]);
+
+  // Search Results inside Command Palette
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+
+    const items: { type: string; title: string; subtitle: string; path: string }[] = [];
+
+    // Search Pages
+    navGroups.forEach((g) => {
+      g.items.forEach((item) => {
+        if (item.name.toLowerCase().includes(q)) {
+          items.push({
+            type: 'Page Navigation',
+            title: item.name,
+            subtitle: g.groupTitle,
+            path: item.path,
+          });
+        }
+      });
+    });
+
+    // Search Permits
+    storageData.permits.forEach((p) => {
+      if (
+        p.permit_number.toLowerCase().includes(q) ||
+        p.permit_type.toLowerCase().includes(q) ||
+        p.proponent_name.toLowerCase().includes(q)
+      ) {
+        items.push({
+          type: 'EPA Permit Record',
+          title: `${p.permit_number} (${p.permit_type})`,
+          subtitle: `Proponent: ${p.proponent_name} • Status: ${p.permit_status}`,
+          path: role === 'admin' ? '/admin/permits' : '/portal/permits',
+        });
+      }
+    });
+
+    // Search Proponents
+    storageData.proponents.forEach((prop) => {
+      if (
+        prop.company_name.toLowerCase().includes(q) ||
+        prop.contact_person.toLowerCase().includes(q) ||
+        prop.email.toLowerCase().includes(q)
+      ) {
+        items.push({
+          type: 'Proponent Company',
+          title: prop.company_name,
+          subtitle: `${prop.contact_person} • ${prop.county}, Liberia`,
+          path: role === 'admin' ? '/admin/proponents' : '/portal/company',
+        });
+      }
+    });
+
+    return items.slice(0, 8);
+  }, [searchQuery, navGroups, storageData, role]);
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row font-sans text-gray-800 antialiased selection:bg-[#D4AF37] selection:text-[#0A2E24]">
+      {/* Mobile Drawer Backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 md:hidden transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Sidebar (Sticky Desktop & Drawer Mobile) */}
+      <aside
+        className={`fixed md:sticky top-0 left-0 bottom-0 z-50 w-72 bg-[#0A2E24] text-white flex flex-col border-r border-[#D4AF37]/30 shadow-2xl transition-transform duration-300 h-screen shrink-0 overflow-hidden ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* Brand Header */}
+        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#08241C]">
+          <Link to="/" className="flex items-center gap-3 group">
+            <img
+              src={LOGO_URL}
+              alt="AEC Logo"
+              className="h-9 w-auto object-contain transition-transform group-hover:scale-105"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <div>
+              <span className="font-heading font-extrabold text-sm text-white block leading-none tracking-tight">
+                ANSUMANA
+              </span>
+              <span className="text-[10px] text-[#D4AF37] font-mono tracking-wider uppercase block mt-0.5">
+                {role === 'admin' ? 'EPA Admin Portal' : 'Proponent Portal'}
+              </span>
+            </div>
+          </Link>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* User / Proponent Info Profile Widget */}
+        <div className="px-4 py-3 bg-[#1A4A3A]/80 border-b border-[#D4AF37]/20 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 rounded-full bg-[#D4AF37] text-[#0A2E24] font-bold flex items-center justify-center text-xs shrink-0 shadow-md">
+              {role === 'admin' ? 'ADM' : 'CLT'}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-semibold text-white truncate leading-tight">
+                {user?.full_name || 'AEC Portal User'}
+              </p>
+              <p className="text-[10px] text-[#D4AF37] font-mono truncate">
+                {role === 'admin' ? 'System Administrator' : proponent?.company_name || user?.email}
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            Active
+          </span>
+        </div>
+
+        {/* Command Palette Quick Trigger in Sidebar */}
+        <div className="px-3 pt-3">
+          <button
+            onClick={() => setSearchModalOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-all shadow-inner group"
+          >
+            <span className="flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-[#D4AF37] group-hover:scale-110 transition-transform" />
+              <span>Quick Jump / Search...</span>
+            </span>
+            <span className="font-mono text-[10px] bg-white/10 text-gray-300 px-1.5 py-0.5 rounded border border-white/10">
+              Ctrl+K
+            </span>
+          </button>
+        </div>
+
+        {/* Grouped Sidebar Menu Items */}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+          {navGroups.map((group, gIdx) => (
+            <div key={gIdx} className="space-y-1">
+              <div className="px-3 text-[10px] font-mono uppercase font-bold tracking-wider text-[#D4AF37]/80 mb-1">
+                {group.groupTitle}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      end={item.path === '/admin' || item.path === '/portal'}
+                      onClick={() => setSidebarOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all group ${
+                          isActive
+                            ? 'bg-[#1A4A3A] text-white font-bold border-l-4 border-[#D4AF37] shadow-sm'
+                            : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-2.5 truncate">
+                        <Icon className="w-4 h-4 shrink-0 text-[#D4AF37] group-hover:scale-110 transition-transform" />
+                        <span className="truncate">{item.name}</span>
+                      </div>
+                      {item.badge !== undefined && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold text-white shrink-0 shadow-sm ${
+                            item.badgeColor || 'bg-[#D4AF37] text-[#0A2E24]'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        {/* Demo Role Switcher Drawer Banner */}
+        <div className="p-3 bg-[#1A4A3A]/50 border-t border-white/10 space-y-2">
+          <div className="flex items-center justify-between text-[10px] font-mono uppercase text-[#D4AF37]">
+            <span>Demo View Switcher</span>
+            <Sparkles className="w-3 h-3 text-[#D4AF37]" />
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => {
+                switchRole('admin');
+                navigate('/admin');
+              }}
+              className={`py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all shadow-sm ${
+                role === 'admin'
+                  ? 'bg-[#D4AF37] text-[#0A2E24] font-bold'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              Admin View
+            </button>
+            <button
+              onClick={() => {
+                switchRole('client', 'compliance@liberiagold.lr');
+                navigate('/portal');
+              }}
+              className={`py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all shadow-sm ${
+                role === 'client'
+                  ? 'bg-[#D4AF37] text-[#0A2E24] font-bold'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              Client View
+            </button>
+          </div>
+        </div>
+
+        {/* Bottom Actions */}
+        <div className="p-3 border-t border-white/10 bg-[#08241C] space-y-1">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-300 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 text-[#D4AF37]" />
+            Back to Public Website
+          </Link>
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 rounded-lg hover:bg-red-500/10 transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Viewport */}
+      <div className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0 overflow-hidden">
+        {/* Sticky Top Header */}
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 px-4 sm:px-6 py-2.5 shadow-xs flex items-center justify-between gap-3">
+          {/* Left: Menu Toggle, Logo & Title */}
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:text-[#0A2E24] hover:bg-gray-100 transition-colors shadow-2xs font-bold text-xs shrink-0"
+              aria-label="Toggle navigation menu"
+            >
+              <Menu className="w-5 h-5 text-[#0A2E24]" />
+              <span className="font-sans text-xs font-bold">Menu</span>
+            </button>
+
+            {/* EPA AEC Logo Badge in Dashboard Header */}
+            <Link
+              to={role === 'admin' ? '/admin' : '/portal'}
+              className="flex items-center gap-2 shrink-0 group hover:opacity-95 transition-opacity"
+              title="Return to Dashboard Home"
+            >
+              <div className="w-9 h-9 rounded-xl bg-[#0A2E24] p-1 border border-[#D4AF37]/50 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <img src={LOGO_URL} alt="EPA AEC Logo" className="w-full h-full object-contain" />
+              </div>
+            </Link>
+
+            <div className="flex items-center gap-2 truncate">
+              {role === 'admin' ? (
+                <span className="hidden md:inline-flex items-center gap-1.5 text-xs bg-[#0A2E24] text-[#D4AF37] px-2.5 py-1 rounded-lg font-mono font-bold shadow-xs shrink-0">
+                  <ShieldAlert className="w-3.5 h-3.5" /> EPA ADMIN
+                </span>
+              ) : (
+                <span className="hidden md:inline-flex items-center gap-1.5 text-xs bg-[#1A4A3A] text-[#D4AF37] px-2.5 py-1 rounded-lg font-mono font-bold shadow-xs shrink-0">
+                  <UserCheck className="w-3.5 h-3.5" /> CLIENT PORTAL
+                </span>
+              )}
+              <div className="truncate">
+                <h1 className="font-heading font-extrabold text-xs sm:text-sm md:text-base text-[#0A2E24] truncate leading-tight">
+                  {role === 'admin'
+                    ? 'Liberia EPA Compliance Hub'
+                    : proponent?.company_name || 'Client Compliance Portal'}
+                </h1>
+                <p className="text-[10px] text-gray-500 font-mono truncate hidden sm:block">
+                  {getBreadcrumbLabel()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Quick Search, Quick Action, Notifications, User Menu */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Quick Search Button Header */}
+            <button
+              onClick={() => setSearchModalOpen(true)}
+              className="hidden sm:flex items-center gap-2 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg border border-gray-200 transition-colors"
+            >
+              <Search className="w-3.5 h-3.5 text-[#0A2E24]" />
+              <span>Search permits or pages...</span>
+              <span className="font-mono text-[9px] bg-white text-gray-600 px-1 py-0.2 rounded border border-gray-300">
+                /
+              </span>
+            </button>
+
+            {/* Quick Action Button Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setQuickActionOpen(!quickActionOpen)}
+                className="flex items-center gap-1.5 bg-[#0A2E24] text-[#D4AF37] hover:bg-[#1A4A3A] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Quick Action</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
+
+              {quickActionOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-fadeIn"
+                  onMouseLeave={() => setQuickActionOpen(false)}
+                >
+                  <div className="px-3 py-1.5 border-b border-gray-100 text-[10px] font-mono text-gray-400 uppercase font-bold">
+                    System Quick Actions
+                  </div>
+                  {role === 'admin' ? (
+                    <>
+                      <Link
+                        to="/admin/proponents"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-[#D4AF37]" /> Register Proponent
+                      </Link>
+                      <Link
+                        to="/admin/permits"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <FileCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> Issue EPA Permit
+                      </Link>
+                      <Link
+                        to="/admin/schedules"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <CalendarClock className="w-3.5 h-3.5 text-[#D4AF37]" /> Schedule Audit Deadline
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/portal/evidence"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-[#D4AF37]" /> Submit Evidence File
+                      </Link>
+                      <Link
+                        to="/portal/book"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" /> Book Advisory Session
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Notifications Popover Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(!notifOpen)}
+                className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-[#0A2E24] hover:bg-gray-50 relative transition-colors"
+                aria-label="Notifications"
+              >
+                <BellRing className="w-4 h-4 text-[#0A2E24]" />
+                {(upcomingSessionsList.length > 0 || expiringPermitsList.length > 0 || recentLogs.length > 0) && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border-2 border-white" />
+                )}
+              </button>
+
+              {notifOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 animate-fadeIn"
+                  onMouseLeave={() => setNotifOpen(false)}
+                >
+                  <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                    <span className="font-heading font-bold text-xs text-[#0A2E24] flex items-center gap-1.5">
+                      <BellRing className="w-3.5 h-3.5 text-[#D4AF37]" /> Alerts & Upcoming Sessions
+                    </span>
+                    <span className="text-[10px] font-mono font-bold bg-[#0A2E24] text-[#D4AF37] px-2 py-0.5 rounded-full">
+                      {upcomingSessionsList.length + expiringPermitsList.length} Active Alerts
+                    </span>
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                    {/* Section 1: Upcoming Sessions Alert */}
+                    {upcomingSessionsList.length > 0 && (
+                      <div className="p-3 bg-emerald-50/50 space-y-2">
+                        <div className="text-[10px] font-mono font-bold text-emerald-800 uppercase flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-emerald-600" /> Confirmed Advisory Sessions ({upcomingSessionsList.length})
+                        </div>
+                        {upcomingSessionsList.slice(0, 3).map((session) => (
+                          <Link
+                            key={session.id}
+                            to={role === 'admin' ? '/admin/bookings' : '/portal/book'}
+                            onClick={() => setNotifOpen(false)}
+                            className="block bg-white p-2.5 rounded-xl border border-emerald-200 hover:border-emerald-400 transition-colors space-y-0.5 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between text-xs font-bold text-[#0A2E24]">
+                              <span>{session.company_name || session.full_name}</span>
+                              <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                                {session.preferred_date}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-600">{session.service_needed}</p>
+                            <p className="text-[10px] text-gray-400 font-mono">Time: {session.preferred_time}</p>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Section 2: Expiring Permits Alert */}
+                    {expiringPermitsList.length > 0 && (
+                      <div className="p-3 bg-amber-50/50 space-y-2">
+                        <div className="text-[10px] font-mono font-bold text-amber-900 uppercase flex items-center gap-1">
+                          <FileCheck className="w-3 h-3 text-amber-600" /> Expiring / Renewal Permits ({expiringPermitsList.length})
+                        </div>
+                        {expiringPermitsList.slice(0, 3).map((p) => (
+                          <Link
+                            key={p.id}
+                            to={role === 'admin' ? '/admin/permits' : '/portal/permits'}
+                            onClick={() => setNotifOpen(false)}
+                            className="block bg-white p-2.5 rounded-xl border border-amber-200 hover:border-amber-400 transition-colors space-y-0.5 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between text-xs font-bold text-[#0A2E24]">
+                              <span>{p.permit_number}</span>
+                              <span className="text-[10px] font-mono bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold">
+                                {p.permit_status}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-gray-600 truncate">{p.proponent_name}</p>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Section 3: Dispatched Logs */}
+                    <div className="p-3 space-y-2">
+                      <div className="text-[10px] font-mono font-bold text-gray-500 uppercase">Recent System Logs</div>
+                      {recentLogs.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No recent log entries.</p>
+                      ) : (
+                        recentLogs.slice(0, 3).map((log) => (
+                          <div key={log.id} className="p-2 hover:bg-gray-50 rounded-lg text-xs space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-mono font-bold text-[#0A2E24] bg-emerald-50 px-1.5 py-0.5 rounded text-emerald-800">
+                                {log.channel}
+                              </span>
+                              <span className="text-[9px] font-mono text-gray-400">
+                                {new Date(log.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-xs font-semibold text-gray-800">{log.subject}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Profile Dropdown Menu in Header */}
+            <ProfileMenu
+              variant="light"
+              onViewAccount={() => setProfileModalOpen(true)}
+              showRoleSwitcher
+              onLogout={handleSignOut}
+            />
+          </div>
+
+          {/* Horizontal Module Navigation Bar */}
+          <nav className="bg-[#0A2E24] text-white px-4 sm:px-6 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar border-t border-[#D4AF37]/30 shadow-inner">
+            <span className="text-[10px] font-mono font-bold uppercase text-[#D4AF37] pr-2 shrink-0 border-r border-white/10 hidden sm:inline-block">
+              {role === 'admin' ? 'Admin Navigation' : 'Client Navigation'}
+            </span>
+            {topNavLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.path;
+              return (
+                <Link
+                  key={link.path}
+                  to={link.path}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+                    isActive
+                      ? 'bg-[#D4AF37] text-[#0A2E24] font-bold shadow-xs scale-105'
+                      : 'text-gray-200 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>{link.name}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </header>
+
+        {/* Sub-Header Breadcrumbs Bar */}
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center justify-between text-xs text-gray-500 font-mono">
+          <div className="flex items-center gap-2 truncate">
+            <Link to={role === 'admin' ? '/admin' : '/portal'} className="hover:text-[#0A2E24]">
+              {role === 'admin' ? 'Admin' : 'Portal'}
+            </Link>
+            <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
+            <span className="text-[#0A2E24] font-semibold truncate">{getBreadcrumbLabel()}</span>
+          </div>
+          <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> EPA Liberia Portal Synchronized
+          </span>
+        </div>
+
+        {/* Dynamic Outlet Page Content */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4">
+          {/* Upcoming Sessions / Expiring Permits Toast Banner */}
+          {showToastBanner && (upcomingSessionsList.length > 0 || expiringPermitsList.length > 0) && (
+            <div className="bg-gradient-to-r from-[#0A2E24] via-[#1A4A3A] to-[#0A2E24] text-white p-3.5 rounded-2xl shadow-lg border border-[#D4AF37]/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-[#D4AF37] text-[#0A2E24] flex items-center justify-center shrink-0 shadow-sm font-bold">
+                  <BellRing className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-heading font-extrabold text-[#D4AF37] flex items-center gap-1.5">
+                    <span>UPCOMING SESSIONS & STATUTORY ALERTS</span>
+                    <span className="px-1.5 py-0.2 bg-red-500 text-white rounded text-[9px] font-mono">ACTION REQUIRED</span>
+                  </p>
+                  <p className="text-xs text-gray-200 mt-0.5">
+                    You have <strong className="text-white underline">{upcomingSessionsList.length} confirmed advisory sessions</strong> booked and <strong className="text-[#D4AF37] underline">{expiringPermitsList.length} EPA permits</strong> requiring renewal or status review.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <Link
+                  to={role === 'admin' ? '/admin/bookings' : '/portal/book'}
+                  className="px-3 py-1.5 bg-[#D4AF37] text-[#0A2E24] hover:bg-[#E5C964] font-heading font-bold text-xs rounded-xl transition-all shadow-xs"
+                >
+                  View Booked Sessions
+                </Link>
+                <button
+                  onClick={() => setShowToastBanner(false)}
+                  className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10"
+                  aria-label="Dismiss alert"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile Bottom Navigation Bar (Fixed at bottom on phones) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0A2E24] border-t border-[#D4AF37]/30 flex justify-around items-center p-1 shadow-2xl">
+        {mobileBottomNav.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              end={item.path === '/admin' || item.path === '/portal'}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-2 rounded-lg text-[10px] font-medium transition-colors relative ${
+                  isActive ? 'text-[#D4AF37] font-bold bg-[#1A4A3A]' : 'text-gray-300 hover:text-white'
+                }`
+              }
+            >
+              <div className="relative">
+                <Icon className="w-5 h-5 mb-0.5" />
+                {item.badge !== undefined && (
+                  <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[8px] font-bold px-1 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+              <span className="truncate max-w-[60px]">{item.name}</span>
+            </NavLink>
+          );
+        })}
+
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="flex flex-col items-center justify-center py-1 px-2 rounded-lg text-[10px] font-medium text-gray-300 hover:text-white"
+        >
+          <Menu className="w-5 h-5 mb-0.5 text-[#D4AF37]" />
+          <span>Menu</span>
+        </button>
+      </div>
+
+      {/* Command Palette Modal (Ctrl+K or Header Search) */}
+      {searchModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-xl overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex items-center gap-3 bg-gray-50">
+              <Search className="w-5 h-5 text-[#0A2E24]" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search pages, permit numbers (e.g., EPA-LR), or proponents..."
+                className="w-full text-sm focus:outline-none bg-transparent"
+              />
+              <button
+                onClick={() => setSearchModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto p-2 divide-y divide-gray-100">
+              {searchQuery.trim() === '' ? (
+                <div className="p-6 text-center text-xs text-gray-500 space-y-2">
+                  <Command className="w-8 h-8 text-[#D4AF37] mx-auto opacity-80" />
+                  <p className="font-bold text-[#0A2E24]">Portal Quick Command Palette</p>
+                  <p>Type to jump to any page, EPA permit record, or proponent profile.</p>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="p-6 text-center text-xs text-gray-500">
+                  No records or pages matching &quot;{searchQuery}&quot;
+                </div>
+              ) : (
+                searchResults.map((res, rIdx) => (
+                  <button
+                    key={rIdx}
+                    onClick={() => {
+                      setSearchModalOpen(false);
+                      setSearchQuery('');
+                      navigate(res.path);
+                    }}
+                    className="w-full text-left p-3 hover:bg-gray-50 rounded-xl transition-colors flex items-center justify-between group"
+                  >
+                    <div>
+                      <span className="text-[10px] font-mono text-[#D4AF37] uppercase font-bold block">
+                        {res.type}
+                      </span>
+                      <p className="text-xs font-bold text-[#0A2E24] group-hover:text-[#D4AF37] transition-colors">
+                        {res.title}
+                      </p>
+                      <p className="text-[11px] text-gray-500 truncate">{res.subtitle}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#D4AF37] transition-colors" />
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-[11px] font-mono text-gray-500">
+              <span>Press ESC or click outside to exit</span>
+              <span className="text-[#0A2E24] font-bold">AEC Liberia Compliance System</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Account Profile Details Modal */}
+      {profileModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-200">
+            <div className="p-6 bg-[#0A2E24] text-white flex items-center justify-between border-b border-[#D4AF37]/30">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-[#D4AF37] text-[#0A2E24] font-extrabold text-lg flex items-center justify-center shadow-lg shrink-0">
+                  {user?.full_name?.charAt(0) || 'U'}
+                </div>
+                <div>
+                  <h3 className="font-heading font-extrabold text-lg text-white leading-tight">User Account Profile</h3>
+                  <p className="text-xs text-[#D4AF37] font-mono mt-0.5">EPA Compliance Hub Account Information</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setProfileModalOpen(false)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-sans">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                  <span className="text-gray-500 font-medium">Full Name:</span>
+                  <span className="font-extrabold text-gray-900">{user?.full_name || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                  <span className="text-gray-500 font-medium">Email Address:</span>
+                  <span className="font-bold text-[#0A2E24] font-mono">{user?.email || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                  <span className="text-gray-500 font-medium">Account Role:</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#0A2E24] text-[#D4AF37]">
+                    {role === 'admin' ? 'EPA System Administrator' : 'Licensed Proponent'}
+                  </span>
+                </div>
+                {proponent && (
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                    <span className="text-gray-500 font-medium">Associated Company:</span>
+                    <span className="font-bold text-gray-900">{proponent.company_name}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between pb-2 border-b border-gray-200">
+                  <span className="text-gray-500 font-medium">Account ID:</span>
+                  <span className="font-mono text-gray-600">{user?.id || 'USR-2026-AEC'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 font-medium">Account Status:</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Active & Verified
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setProfileModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                >
+                  Close
+                </button>
+                <Link
+                  to={role === 'admin' ? '/admin/settings' : '/portal/company'}
+                  onClick={() => setProfileModalOpen(false)}
+                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  Edit Settings
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,6 @@
+{
+  "name": "AEC Compliance Portal",
+  "description": "Environmental compliance portal and marketing website for Ansumana Environmental Consultancy Inc.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
