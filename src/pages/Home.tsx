@@ -79,13 +79,14 @@ export const Home: React.FC = () => {
       <section className="relative min-h-[90vh] flex items-center bg-[#0A2E24] text-white overflow-hidden pt-12 pb-20">
         {/* Background Image Overlay */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-overlay scale-105 transition-transform duration-1000"
+          className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-1000"
           style={{
             backgroundImage:
-              'url("https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=2000&q=80")',
+              'url("https://images.unsplash.com/photo-1571223641822-b82408a0e705?auto=format&fit=crop&w=2000&q=80")',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A2E24] via-[#0A2E24]/90 to-transparent" />
+        <div className="absolute inset-0 bg-[#0A2E24]/40 md:bg-[#0A2E24]/20" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0A2E24] via-[#0A2E24]/85 to-transparent" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full py-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
