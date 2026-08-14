@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Leaf, Menu, X, Shield, PhoneCall, LogIn } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { ProfileMenu } from '../common/ProfileMenu';
+import { ThemeToggle } from '../common/ThemeToggle';
 
 const LOGO_URL = 'https://media.base44.com/images/public/6a41d19b1eb6cd6bf679b527/c2b37abf0_ChatGPTImageJul28202601_07_19AM.png';
 
@@ -96,6 +97,8 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop Right CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle variant="dark" />
+
             <Link
               to="/book"
               className="px-4 py-2 text-xs lg:text-sm font-semibold rounded-lg bg-gradient-to-r from-[#D4AF37] to-[#E5C964] text-[#0A2E24] hover:from-[#E5C964] hover:to-[#D4AF37] shadow-md transition-all flex items-center gap-2 hover:scale-105 active:scale-95"
@@ -119,6 +122,7 @@ export const Navbar: React.FC = () => {
 
           {/* Mobile menu button */}
           <div className="flex md:hidden items-center gap-2">
+            <ThemeToggle variant="dark" />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 rounded-lg text-gray-200 hover:text-[#D4AF37] hover:bg-white/10 focus:outline-none"

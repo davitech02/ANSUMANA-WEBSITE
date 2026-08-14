@@ -21,6 +21,7 @@ import { sendEmailNotification } from '../../lib/notifications';
 import { PermitStatusBadge, ActionStatusBadge } from '../../components/common/StatusBadges';
 import { ComplianceStatsWidget } from '../../components/common/ComplianceStatsWidget';
 import { DateRangeFilter, DateRange } from '../../components/common/DateRangeFilter';
+import { ComplianceProgressChart } from '../../components/common/ComplianceProgressChart';
 
 export const AdminDashboard: React.FC = () => {
   const [data, setData] = useState(() => getStorageData());
@@ -61,6 +62,26 @@ export const AdminDashboard: React.FC = () => {
   const openFindings = data.findings.filter((f) => f.action_status !== 'Verified').length;
   const pendingEvidence = data.evidence.filter((e) => e.review_status === 'Pending review').length;
   const newRequests = data.requests.filter((r) => r.status === 'New').length;
+
+  // Compliance Progress Chart data — grouped by proponent company
+  const complianceProgressData = data.proponents.map((prop) => {
+    const scheds = data.schedules.filter((s) => s.proponent_id === prop.id);
+    const complete = scheds.filter((s) => s.status === 'Completed').length;
+    const pending = scheds.filter((s) => s.status === 'Pending' || s.status === 'Submitted').length;
+    const overdue = scheds.filter((s) => s.status === 'Overdue').length;
+    return {
+      period: prop.company_name.split(' ')[0],
+      completed: complete,
+      pending,
+      overdue,
+    };
+  });
+  const totalProgress =
+    data.schedules.length + data.findings.length + data.evidence.length;
+  const completedProgress =
+    data.schedules.filter((s) => s.status === 'Completed').length +
+    data.findings.filter((f) => f.action_status === 'Verified').length +
+    data.evidence.filter((e) => e.review_status === 'Approved').length;
 
   const handleExportData = () => {
     // Export Findings CSV
@@ -239,6 +260,15 @@ export const AdminDashboard: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* Compliance Progress Tracker */}
+      <ComplianceProgressChart
+        title="Fleet-wide Compliance Progress Tracker"
+        subtitle="Completed vs pending vs overdue statutory requirements per proponent"
+        data={complianceProgressData}
+        total={totalProgress}
+        completedTotal={completedProgress}
+      />
 
       {/* Main Panels Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

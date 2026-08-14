@@ -55,6 +55,13 @@ export const CheckStatus: React.FC = () => {
     <div className="space-y-12 py-10">
       {/* HERO BANNER */}
       <section className="bg-[#0A2E24] text-white py-14 relative overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-20"
+          style={{
+            backgroundImage:
+              'url("https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=2000&q=80")',
+          }}
+        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1A4A3A] border border-[#D4AF37]/40 text-[#D4AF37] text-xs font-mono">
             <Lock className="w-3.5 h-3.5" /> Public Unauthenticated Permit Search

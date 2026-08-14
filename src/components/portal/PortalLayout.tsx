@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -33,6 +33,9 @@ import {
 import { useAuth } from '../../lib/AuthContext';
 import { getStorageData, StorageData } from '../../lib/storage';
 import { ProfileMenu } from '../common/ProfileMenu';
+import { ThemeToggle } from '../common/ThemeToggle';
+import { Breadcrumbs } from '../common/Breadcrumbs';
+import { NotificationDropdown } from '../common/NotificationDropdown';
 
 const LOGO_URL =
   'https://media.base44.com/images/public/6a41d19b1eb6cd6bf679b527/c2b37abf0_ChatGPTImageJul28202601_07_19AM.png';
@@ -44,13 +47,13 @@ interface PortalLayoutProps {
 export const PortalLayout: React.FC<PortalLayoutProps> = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [quickActionOpen, setQuickActionOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [storageData, setStorageData] = useState<StorageData>(() => getStorageData());
   const [showToastBanner, setShowToastBanner] = useState(true);
+  const quickActionRef = useRef<HTMLDivElement>(null);
 
   const { user, proponent, logout, switchRole } = useAuth();
   const navigate = useNavigate();
@@ -64,6 +67,26 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
     const handleUpdate = () => setStorageData(getStorageData());
     window.addEventListener('aec_storage_updated', handleUpdate);
     return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+  }, []);
+
+  // Outside click + Escape to close Quick Action
+  useEffect(() => {
+    const handlePointerDown = (e: MouseEvent) => {
+      if (quickActionRef.current && !quickActionRef.current.contains(e.target as Node)) {
+        setQuickActionOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setQuickActionOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   // Keyboard shortcut Ctrl+K / Cmd+K for command palette
@@ -217,6 +240,8 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
     if (p === '/admin/email-logs') return 'Email Dispatch Audit Trail';
     if (p === '/admin/whatsapp-logs') return 'WhatsApp Alert Audit Logs';
     if (p === '/admin/settings') return 'AEC System Settings';
+    if (p === '/admin/support') return 'Support Helpdesk';
+    if (p === '/admin/contact') return 'Contact AEC';
 
     if (p === '/portal') return 'Client Dashboard';
     if (p === '/portal/company') return 'Company Profile & Info';
@@ -232,9 +257,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
     return 'Compliance Portal';
   };
 
-  // Notifications for bell popover
-  const recentLogs = storageData.logs.slice(0, 5);
-
+  // Notifications for toast banner
   const upcomingSessionsList = useMemo(() => {
     return storageData.bookings.filter((b) => b.booking_status === 'Confirmed');
   }, [storageData.bookings]);
@@ -535,13 +558,15 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
             </button>
           </div>
 
-          {/* Right: Quick Action, Notifications, Profile */}
+          {/* Right: Quick Action, Theme Toggle, Notifications, Profile */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Quick Action Button Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={quickActionRef}>
               <button
                 onClick={() => setQuickActionOpen(!quickActionOpen)}
                 className="flex items-center gap-1.5 bg-[#0A2E24] text-[#D4AF37] hover:bg-[#1A4A3A] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-xs"
+                aria-label="Quick actions"
+                aria-expanded={quickActionOpen}
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Quick Action</span>
@@ -550,10 +575,10 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
 
               {quickActionOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1.5 z-50 animate-fadeIn"
+                  className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#14231E] rounded-xl shadow-xl border border-gray-200 dark:border-gray-300 py-1.5 z-50 animate-fadeIn"
                   onMouseLeave={() => setQuickActionOpen(false)}
                 >
-                  <div className="px-3 py-1.5 border-b border-gray-100 text-[10px] font-mono text-gray-400 uppercase font-bold">
+                  <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-300 text-[10px] font-mono text-gray-400 uppercase font-bold">
                     System Quick Actions
                   </div>
                   {role === 'admin' ? (
@@ -561,23 +586,44 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
                       <Link
                         to="/admin/proponents"
                         onClick={() => setQuickActionOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
                       >
                         <Building2 className="w-3.5 h-3.5 text-[#D4AF37]" /> Register Proponent
                       </Link>
                       <Link
                         to="/admin/permits"
                         onClick={() => setQuickActionOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
                       >
                         <FileCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> Issue EPA Permit
                       </Link>
                       <Link
                         to="/admin/schedules"
                         onClick={() => setQuickActionOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
                       >
                         <CalendarClock className="w-3.5 h-3.5 text-[#D4AF37]" /> Schedule Audit Deadline
+                      </Link>
+                      <Link
+                        to="/admin/findings"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 text-[#D4AF37]" /> Log Non-Compliance Finding
+                      </Link>
+                      <Link
+                        to="/admin/evidence"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-[#D4AF37]" /> Review Evidence Uploads
+                      </Link>
+                      <Link
+                        to="/admin/requests"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-[#D4AF37]" /> View Client Requests
                       </Link>
                     </>
                   ) : (
@@ -585,16 +631,30 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
                       <Link
                         to="/portal/evidence"
                         onClick={() => setQuickActionOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
                       >
                         <Upload className="w-3.5 h-3.5 text-[#D4AF37]" /> Submit Evidence File
                       </Link>
                       <Link
                         to="/portal/book"
                         onClick={() => setQuickActionOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
                       >
                         <Calendar className="w-3.5 h-3.5 text-[#D4AF37]" /> Book Advisory Session
+                      </Link>
+                      <Link
+                        to="/portal/permits"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
+                      >
+                        <FileCheck className="w-3.5 h-3.5 text-[#D4AF37]" /> View My Permits
+                      </Link>
+                      <Link
+                        to="/portal/schedules"
+                        onClick={() => setQuickActionOpen(false)}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-200"
+                      >
+                        <CalendarClock className="w-3.5 h-3.5 text-[#D4AF37]" /> Check Report Deadlines
                       </Link>
                     </>
                   )}
@@ -602,110 +662,11 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
               )}
             </div>
 
-            {/* Notifications Popover Bell */}
-            <div className="relative">
-              <button
-                onClick={() => setNotifOpen(!notifOpen)}
-                className="p-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-[#0A2E24] hover:bg-gray-50 relative transition-colors"
-                aria-label="Notifications"
-              >
-                <BellRing className="w-4 h-4 text-[#0A2E24]" />
-                {(upcomingSessionsList.length > 0 || expiringPermitsList.length > 0 || recentLogs.length > 0) && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse border-2 border-white" />
-                )}
-              </button>
+            {/* Theme Toggle */}
+            <ThemeToggle variant="light" />
 
-              {notifOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 z-50 animate-fadeIn"
-                  onMouseLeave={() => setNotifOpen(false)}
-                >
-                  <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                    <span className="font-heading font-bold text-xs text-[#0A2E24] flex items-center gap-1.5">
-                      <BellRing className="w-3.5 h-3.5 text-[#D4AF37]" /> Alerts & Upcoming Sessions
-                    </span>
-                    <span className="text-[10px] font-mono font-bold bg-[#0A2E24] text-[#D4AF37] px-2 py-0.5 rounded-full">
-                      {upcomingSessionsList.length + expiringPermitsList.length} Active Alerts
-                    </span>
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                    {/* Section 1: Upcoming Sessions Alert */}
-                    {upcomingSessionsList.length > 0 && (
-                      <div className="p-3 bg-emerald-50/50 space-y-2">
-                        <div className="text-[10px] font-mono font-bold text-emerald-800 uppercase flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-emerald-600" /> Confirmed Advisory Sessions ({upcomingSessionsList.length})
-                        </div>
-                        {upcomingSessionsList.slice(0, 3).map((session) => (
-                          <Link
-                            key={session.id}
-                            to={role === 'admin' ? '/admin/bookings' : '/portal/book'}
-                            onClick={() => setNotifOpen(false)}
-                            className="block bg-white p-2.5 rounded-xl border border-emerald-200 hover:border-emerald-400 transition-colors space-y-0.5 shadow-2xs"
-                          >
-                            <div className="flex items-center justify-between text-xs font-bold text-[#0A2E24]">
-                              <span>{session.company_name || session.full_name}</span>
-                              <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                                {session.preferred_date}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-gray-600">{session.service_needed}</p>
-                            <p className="text-[10px] text-gray-400 font-mono">Time: {session.preferred_time}</p>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Section 2: Expiring Permits Alert */}
-                    {expiringPermitsList.length > 0 && (
-                      <div className="p-3 bg-amber-50/50 space-y-2">
-                        <div className="text-[10px] font-mono font-bold text-amber-900 uppercase flex items-center gap-1">
-                          <FileCheck className="w-3 h-3 text-amber-600" /> Expiring / Renewal Permits ({expiringPermitsList.length})
-                        </div>
-                        {expiringPermitsList.slice(0, 3).map((p) => (
-                          <Link
-                            key={p.id}
-                            to={role === 'admin' ? '/admin/permits' : '/portal/permits'}
-                            onClick={() => setNotifOpen(false)}
-                            className="block bg-white p-2.5 rounded-xl border border-amber-200 hover:border-amber-400 transition-colors space-y-0.5 shadow-2xs"
-                          >
-                            <div className="flex items-center justify-between text-xs font-bold text-[#0A2E24]">
-                              <span>{p.permit_number}</span>
-                              <span className="text-[10px] font-mono bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded font-bold">
-                                {p.permit_status}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-gray-600 truncate">{p.proponent_name}</p>
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Section 3: Dispatched Logs */}
-                    <div className="p-3 space-y-2">
-                      <div className="text-[10px] font-mono font-bold text-gray-500 uppercase">Recent System Logs</div>
-                      {recentLogs.length === 0 ? (
-                        <p className="text-xs text-gray-400 italic">No recent log entries.</p>
-                      ) : (
-                        recentLogs.slice(0, 3).map((log) => (
-                          <div key={log.id} className="p-2 hover:bg-gray-50 rounded-lg text-xs space-y-0.5">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-mono font-bold text-[#0A2E24] bg-emerald-50 px-1.5 py-0.5 rounded text-emerald-800">
-                                {log.channel}
-                              </span>
-                              <span className="text-[9px] font-mono text-gray-400">
-                                {new Date(log.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <p className="text-xs font-semibold text-gray-800">{log.subject}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Notifications Dropdown */}
+            <NotificationDropdown role={role} proponentId={proponent?.id} />
 
             {/* Profile Dropdown Menu in Header */}
             <ProfileMenu
@@ -718,15 +679,14 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
         </header>
 
         {/* Sub-Header Breadcrumbs Bar */}
-        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 flex items-center justify-between text-xs text-gray-500 font-mono">
-          <div className="flex items-center gap-2 truncate">
-            <Link to={role === 'admin' ? '/admin' : '/portal'} className="hover:text-[#0A2E24]">
-              {role === 'admin' ? 'Admin' : 'Portal'}
-            </Link>
-            <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
-            <span className="text-[#0A2E24] font-semibold truncate">{getBreadcrumbLabel()}</span>
-          </div>
-          <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+        <div className="bg-white dark:bg-[#14231E] border-b border-gray-200 dark:border-gray-300 px-4 sm:px-6 py-2 flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400 font-mono">
+          <Breadcrumbs
+            items={[
+              { label: role === 'admin' ? 'Admin' : 'Portal', to: role === 'admin' ? '/admin' : '/portal' },
+              { label: getBreadcrumbLabel() },
+            ]}
+          />
+          <span className="hidden md:inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-700 bg-emerald-50 dark:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-300">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" /> EPA Liberia Portal Synchronized
           </span>
         </div>

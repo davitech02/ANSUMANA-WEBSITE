@@ -89,6 +89,13 @@ export const BookSession: React.FC = () => {
     <div className="space-y-16 py-10">
       {/* HERO BANNER */}
       <section className="bg-[#0A2E24] text-white py-14 relative overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-20"
+          style={{
+            backgroundImage:
+              'url("https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=2000&q=80")',
+          }}
+        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-3">
           <span className="text-[#D4AF37] font-mono text-xs tracking-widest uppercase font-bold">
             Ansumana Environmental Consultancy Inc.

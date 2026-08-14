@@ -18,12 +18,15 @@ import {
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useAuth } from '../../lib/AuthContext';
+import { useTheme } from '../../lib/ThemeContext';
 import { getStorageData } from '../../lib/storage';
 import { PermitStatusBadge, ComplianceStatusBadge } from '../../components/common/StatusBadges';
 import { ComplianceStatsWidget } from '../../components/common/ComplianceStatsWidget';
+import { ComplianceProgressChart } from '../../components/common/ComplianceProgressChart';
 
 export const ClientDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [data, setData] = useState(() => getStorageData());
 
   useEffect(() => {
@@ -68,6 +71,43 @@ export const ClientDashboard: React.FC = () => {
       Overdue: clientSchedules.filter((s) => s.status === 'Overdue').length,
     },
   ];
+
+  const dark = theme === 'dark';
+  const axisColor = dark ? '#8FA99D' : '#64748b';
+  const gridColor = dark ? '#2B4238' : '#e2e8f0';
+  const tooltipStyle = {
+    backgroundColor: dark ? '#14231E' : '#ffffff',
+    border: `1px solid ${dark ? '#355046' : '#e2e8f0'}`,
+    borderRadius: '0.75rem',
+    fontSize: '11px',
+  };
+
+  // Compliance Progress Tracker Data
+  const complianceProgressData = [
+    {
+      period: 'Reports',
+      completed: clientSchedules.filter((s) => s.status === 'Completed').length,
+      pending: clientSchedules.filter((s) => s.status === 'Pending').length,
+      overdue: clientSchedules.filter((s) => s.status === 'Overdue').length,
+    },
+    {
+      period: 'Findings',
+      completed: clientFindings.filter((f) => f.action_status === 'Verified').length,
+      pending: clientFindings.filter((f) => f.action_status !== 'Verified' && f.action_status !== 'Overdue').length,
+      overdue: clientFindings.filter((f) => f.action_status === 'Overdue').length,
+    },
+    {
+      period: 'Evidence',
+      completed: clientEvidence.filter((e) => e.review_status === 'Approved').length,
+      pending: clientEvidence.filter((e) => e.review_status === 'Pending review').length,
+      overdue: 0,
+    },
+  ];
+  const totalProgress = clientSchedules.length + clientFindings.length + clientEvidence.length;
+  const completedProgress =
+    clientSchedules.filter((s) => s.status === 'Completed').length +
+    clientFindings.filter((f) => f.action_status === 'Verified').length +
+    clientEvidence.filter((e) => e.review_status === 'Approved').length;
 
   return (
     <div className="space-y-8 font-sans">
@@ -182,6 +222,15 @@ export const ClientDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Compliance Progress Tracker */}
+      <ComplianceProgressChart
+        title="My Compliance Progress Tracker"
+        subtitle="Completed vs pending vs overdue statutory requirements"
+        data={complianceProgressData}
+        total={totalProgress}
+        completedTotal={completedProgress}
+      />
+
       {/* Visual Data Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Pie Chart: Compliance Breakdown */}
@@ -206,8 +255,8 @@ export const ClientDashboard: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px' }} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px', color: dark ? '#C6D6CE' : '#334155' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -222,10 +271,10 @@ export const ClientDashboard: React.FC = () => {
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData}>
-                <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <XAxis dataKey="period" tick={{ fontSize: 11, fill: axisColor }} />
+                <YAxis tick={{ fontSize: 11, fill: axisColor }} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ fontSize: '11px', color: dark ? '#C6D6CE' : '#334155' }} />
                 <Bar dataKey="Completed" fill="#059669" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Pending" fill="#D97706" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Overdue" fill="#DC2626" radius={[4, 4, 0, 0]} />
