@@ -2,19 +2,25 @@
 
 Production-ready Flask backend for the AEC Compliance Portal React frontend.
 
-> **Status:** Foundation only. No models, no auth, no CRUD, no frontend
+> **Status:** Foundation + tooling. No models, no auth, no CRUD, no frontend
 > integration yet. This step establishes the application skeleton, configuration,
-> extensions, CORS, and a health endpoint.
+> extensions, CORS, standardized response envelopes, JSON error handlers,
+> rate limiting, and a health endpoint.
 
 ## Tech Stack
 
 - Python 3
 - Flask
-- Flask-RESTful
 - Flask-SQLAlchemy
 - Flask-Migrate
 - Flask-JWT-Extended
 - Flask-CORS
+- Flask-Limiter
+- Flask-Mail
+- Flask-Marshmallow / marshmallow / marshmallow-sqlalchemy
+- APScheduler
+- email-validator
+- requests
 - PostgreSQL
 - python-dotenv
 - psycopg2-binary
@@ -30,7 +36,7 @@ backend/
 │   ├── models/            # SQLAlchemy models (added later)
 │   ├── routes/            # API blueprints (health, ...)
 │   ├── services/          # business logic (added later)
-│   └── utils/             # shared helpers (added later)
+│   └── utils/             # response envelope + error handlers
 ├── migrations/            # Flask-Migrate migrations (generated later)
 ├── tests/                 # pytest tests
 ├── .env.example           # template for environment variables
@@ -85,8 +91,20 @@ Example:
 
 ```bash
 curl http://localhost:5000/api/health
-# {"status":"success","message":"API is running"}
+# {"status":"success","data":{"service":"aec-compliance-api"},"message":"API is running"}
 ```
+
+## Response Envelope
+
+All endpoints return a standardized envelope:
+
+- Success: `{"status": "success", "data": ..., "message": ...}`
+- Error:   `{"status": "error", "code": ..., "message": ...}`
+- Paginated lists: `data = {"items": [...], "pagination": {"page", "per_page",
+  "total", "total_pages"}}` (default 25 per page, capped at 100).
+
+HTTP errors (404/405/413/500) are rendered as JSON error envelopes by the
+global handlers in `app/utils/errors.py`.
 
 ## Running Tests
 
@@ -97,5 +115,6 @@ pytest
 ## Configuration
 
 All configuration is driven by environment variables. See `.env.example` for
-the full list. Production configuration validates that required secrets and
-origins are present and refuses a wildcard `CORS_ORIGINS`.
+the full list (JWT cookie flags, uploads, SMTP mail, WhatsApp, rate limiting).
+Production configuration validates that required secrets and origins are present
+and refuses a wildcard `CORS_ORIGINS`.

@@ -29,6 +29,22 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    """Parse an environment variable as a boolean."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _env_int(name: str, default: int) -> int:
+    """Parse an environment variable as an integer, falling back on default."""
+    try:
+        return int(os.environ.get(name, ""))
+    except ValueError:
+        return default
+
+
 class Config:
     """Base configuration shared across environments."""
 
@@ -49,7 +65,49 @@ class Config:
 
     # JWT algorithm & lifetime (defaults)
     JWT_ALGORITHM = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRES = 3600  # 1 hour
+    JWT_ACCESS_TOKEN_EXPIRES = _env_int("JWT_ACCESS_TOKEN_EXPIRES", 3600)  # 1 hour
+    JWT_REFRESH_TOKEN_EXPIRES = _env_int(
+        "JWT_REFRESH_TOKEN_EXPIRES", 30 * 24 * 3600
+    )  # 30 days
+
+    # JWT cookie transport (auth phase)
+    JWT_TOKEN_LOCATION = ["cookies"]
+    JWT_COOKIE_NAME = "aec_access"
+    JWT_REFRESH_COOKIE_NAME = "aec_refresh"
+    JWT_COOKIE_SECURE = _env_bool("JWT_COOKIE_SECURE", False)
+    JWT_COOKIE_SAMESITE = os.environ.get("JWT_COOKIE_SAMESITE", "Lax")
+    JWT_COOKIE_CSRF_PROTECT = _env_bool("JWT_COOKIE_CSRF_PROTECT", True)
+    JWT_CSRF_HEADER_NAME = "X-CSRF-TOKEN"
+    JWT_ACCESS_CSRF_COOKIE_NAME = "aec_csrf"
+    JWT_REFRESH_CSRF_COOKIE_NAME = "aec_csrf_refresh"
+
+    # Uploads
+    UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
+    MAX_CONTENT_LENGTH = _env_int("MAX_CONTENT_LENGTH", 16 * 1024 * 1024)
+
+    # Email (Flask-Mail). SMTP_* are the primary keys; MAIL_* are accepted
+    # as compatibility aliases.
+    MAIL_SERVER = os.environ.get("SMTP_HOST", os.environ.get("MAIL_SERVER", ""))
+    MAIL_PORT = _env_int("SMTP_PORT", 587)
+    MAIL_USE_TLS = _env_bool("SMTP_USE_TLS", True)
+    MAIL_USE_SSL = _env_bool("SMTP_USE_SSL", False)
+    MAIL_USERNAME = os.environ.get(
+        "SMTP_USERNAME", os.environ.get("MAIL_USERNAME", "")
+    )
+    MAIL_PASSWORD = os.environ.get(
+        "SMTP_PASSWORD", os.environ.get("MAIL_PASSWORD", "")
+    )
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", "")
+
+    # WhatsApp notifications (integration added in a later phase)
+    WHATSAPP_API_URL = os.environ.get("WHATSAPP_API_URL", "")
+    WHATSAPP_API_TOKEN = os.environ.get("WHATSAPP_API_TOKEN", "")
+    WHATSAPP_SENDER_PHONE = os.environ.get("WHATSAPP_SENDER_PHONE", "")
+
+    # Rate limiting (Flask-Limiter)
+    RATELIMIT_DEFAULT = os.environ.get("RATELIMIT_DEFAULT", "200 per hour")
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    RATELIMIT_HEADERS_ENABLED = _env_bool("RATELIMIT_HEADERS_ENABLED", False)
 
 
 class DevelopmentConfig(Config):

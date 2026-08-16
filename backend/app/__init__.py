@@ -8,8 +8,9 @@ from flask import Flask
 from flask_cors import CORS
 
 from .config import ProductionConfig, get_config
-from .extensions import db, jwt, migrate
+from .extensions import db, jwt, limiter, ma, mail, migrate
 from .routes import register_blueprints
+from .utils.errors import register_error_handlers
 
 
 def create_app(config_override: str | None = None) -> Flask:
@@ -33,9 +34,15 @@ def create_app(config_override: str | None = None) -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
+    mail.init_app(app)
+    ma.init_app(app)
+    limiter.init_app(app)
 
     # CORS - restrict to configured frontend origins
     CORS(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}})
+
+    # Standardized JSON error responses for all HTTP errors
+    register_error_handlers(app)
 
     # Register API blueprints
     register_blueprints(app)

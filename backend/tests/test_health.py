@@ -21,10 +21,19 @@ def test_health_endpoint_returns_200(client):
     """GET /api/health should return HTTP 200 with the expected payload."""
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.get_json() == {"status": "success", "message": "API is running"}
+    assert response.get_json() == {
+        "status": "success",
+        "data": {"service": "aec-compliance-api"},
+        "message": "API is running",
+    }
 
 
 def test_unknown_api_route_returns_404(client):
-    """An unknown /api route should return HTTP 404."""
+    """An unknown /api route should return HTTP 404 as a JSON error envelope."""
     response = client.get("/api/does-not-exist")
     assert response.status_code == 404
+    assert response.get_json() == {
+        "status": "error",
+        "code": "not_found",
+        "message": "Resource not found.",
+    }
