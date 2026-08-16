@@ -130,7 +130,12 @@ class TestingConfig(Config):
 
     TESTING = True
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "sqlite:///:memory:")
+    # Tests run against an in-memory SQLite database unless an explicit
+    # TEST_DATABASE_URL is provided. DATABASE_URL is deliberately ignored so
+    # a developer's local .env cannot accidentally point tests at Postgres.
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "TEST_DATABASE_URL", "sqlite:///:memory:"
+    )
     CORS_ORIGINS = _env_list("CORS_ORIGINS", "http://localhost:3000")
 
 

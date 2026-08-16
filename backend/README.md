@@ -2,10 +2,10 @@
 
 Production-ready Flask backend for the AEC Compliance Portal React frontend.
 
-> **Status:** Foundation + tooling. No models, no auth, no CRUD, no frontend
+> **Status:** Foundation + tooling + models. No auth, no CRUD, no frontend
 > integration yet. This step establishes the application skeleton, configuration,
 > extensions, CORS, standardized response envelopes, JSON error handlers,
-> rate limiting, and a health endpoint.
+> rate limiting, the full 14-table data model, and a health endpoint.
 
 ## Tech Stack
 
@@ -33,7 +33,7 @@ backend/
 │   ├── __init__.py        # create_app() application factory
 │   ├── config.py          # environment-based configuration
 │   ├── extensions.py      # db, migrate, jwt extension instances
-│   ├── models/            # SQLAlchemy models (added later)
+│   ├── models/            # SQLAlchemy models (users, proponents, permits, ...)
 │   ├── routes/            # API blueprints (health, ...)
 │   ├── services/          # business logic (added later)
 │   └── utils/             # response envelope + error handlers
@@ -80,6 +80,30 @@ python run.py
 ```
 
 The API runs at `http://localhost:5000`.
+
+## Data Model
+
+Fourteen models are defined under `app/models/` (see `app/models/enums.py`
+for the shared enums, which match the frontend `src/types.ts` exactly):
+
+`User`, `Proponent`, `Permit`, `ReportSchedule`, `Finding`, `Evidence`,
+`Booking`, `ServiceRequest`, `Notification`, `NotificationLog`,
+`CompanySettings`, `File`, `AuditLog`, `PasswordResetToken`.
+
+Key decisions:
+
+- UUID primary keys generated with Python `uuid4`.
+- Timezone-aware datetimes via a `UTCDateTime` type (UTC-normalized).
+- PostgreSQL-native enum types (falling back to VARCHAR + CHECK on SQLite).
+- Soft delete (`is_deleted`/`deleted_at`) on proponents, permits, report
+  schedules, findings, evidence, bookings, and service requests.
+- `ON DELETE` policy: RESTRICT on proponent-owned records, SET NULL on
+  optional references, CASCADE only for notifications and password reset
+  tokens owned by a user.
+- Passwords are never stored: `User` carries only `password_hash`. Reset
+  tokens store only a SHA-256 hash (`password_reset_tokens.token_hash`).
+- `File` records metadata only; binary content lives on disk.
+- Emails are normalized (lowercased) and unique.
 
 ## Endpoints
 
