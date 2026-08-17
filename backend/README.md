@@ -3,14 +3,16 @@
 Production-ready Flask backend for the AEC Compliance Portal React frontend.
 
 > **Status:** Foundation + tooling + models + PostgreSQL schema + seeding +
-> authentication. This establishes the application skeleton, configuration,
-> extensions, CORS, standardized response envelopes, JSON error handlers, rate
-> limiting, the full 14-table data model, the PostgreSQL schema via
-> Flask-Migrate, idempotent CLI seeding (`flask create-admin`,
-> `flask seed-demo`), and the complete authentication API (register, login,
-> JWT access/refresh with rotation + blocklisting, logout, `GET /me`,
-> forgot/reset password, per-IP rate limiting, audit logging). No CRUD and no
-> frontend integration yet.
+> authentication + RBAC/ownership isolation. This establishes the application
+> skeleton, configuration, extensions, CORS, standardized response envelopes,
+> JSON error handlers, rate limiting, the full 14-table data model, the
+> PostgreSQL schema via Flask-Migrate, idempotent CLI seeding (`flask
+> create-admin`, `flask seed-demo`), the complete authentication API
+> (register, login, JWT access/refresh with rotation + blocklisting, logout,
+> `GET /me`, forgot/reset password, per-IP rate limiting, audit logging), and
+> the server-enforced authorization layer (admin/client role gates, proponent
+> tenant isolation with 404-on-cross-tenant, SQL-level query scoping, derived
+> file ownership). No CRUD and no frontend integration yet.
 
 ## Tech Stack
 
@@ -40,6 +42,7 @@ backend/
 │   ├── config.py          # environment-based configuration
 │   ├── extensions.py      # db, migrate, jwt extension instances
 │   ├── models/            # SQLAlchemy models (users, proponents, permits, ...)
+│   ├── authorization.py   # RBAC + tenant isolation helpers (admin_required, ...)
 │   ├── routes/            # API blueprints (health, auth, ...)
 │   ├── services/          # business logic (auth_service, audit_service, ...)
 │   └── utils/             # response envelope + error handlers
@@ -248,6 +251,40 @@ token **30 days**; the JWT identity is the user UUID with `role`,
 - Passwords are hashed with **scrypt**; the API never returns or exposes
   `password_hash`.
 
+## Authorization & Tenant Isolation
+
+Authorization is enforced **server-side** in `app/authorization.py` and never
+relies on the frontend (React guards, hidden UI, localStorage roles, or
+request-body `role`/`proponent_id`). Roles and proponent ids always come from
+the database-resolved user identity.
+
+- **Role gates** — `@admin_required` and `@client_required` wrap the
+  authentication chain, resolve the user from the database, reject inactive
+  users, and return `403 {"code": "forbidden"}` when the role does not match
+  (clients on admin routes and admins on client-only routes).
+- **Ownership isolation** — `require_proponent(model, id)` resolves a record
+  scoped to the client's own `proponent_id` at the **SQL level**. A
+  cross-tenant (or missing) id returns `404` — never `403` — so the existence
+  of another tenant's records is not revealed. Admins resolve any resource by
+  id across all proponents via `get_resource_or_404`.
+- **Query scoping** — `scoped_query(model, proponent_id)` builds a query with
+  the ownership predicate in the SQL `WHERE` clause; records are never fetched
+  and filtered in Python. Future client endpoints must follow this pattern.
+- **Write security** — `force_client_proponent_id()` returns the identity's
+  proponent id for writes; any client-supplied `proponent_id` in the body is
+  ignored, so ownership can never be transferred by a client.
+- **File ownership** — files carry no proponent id; `require_file(id)` derives
+  ownership from the referencing permit or evidence of the client's proponent
+  and returns `404` otherwise.
+- **Escalation protection** — registration always assigns `client`;
+  `role`/`proponent_id` in request bodies or query strings are ignored; manual
+  URL entry to admin routes is rejected with `403`.
+
+The security suite (`tests/test_rbac.py`) exercises these utilities end-to-end
+over HTTP through a **test-only** harness blueprint (`tests/rbac_harness.py`,
+`/api/_rbac/*`) that is never registered by the application factory and ships
+no business CRUD.
+
 ## Response Envelope
 
 All endpoints return a standardized envelope:
@@ -271,9 +308,12 @@ cover the health endpoint, response envelope, all 14 models, the CLI commands
 (idempotency/safety), the complete auth API (registration, login, JWT
 issuance/expiry/invalid tokens, refresh rotation + reuse rejection, blocklisted
 logout, password reset incl. expired/reused tokens and session invalidation,
-rate limiting, and secret-free audit logging), and a full migration
-upgrade → downgrade → upgrade round-trip on a throwaway SQLite file.
-Production PostgreSQL is never touched by the test suite.
+rate limiting, and secret-free audit logging), the RBAC/ownership matrix
+(role gates, cross-tenant 404 isolation, privilege escalation attempts,
+SQL-level scoping, derived file ownership, admin cross-tenant access, live
+user deactivation), and a full migration upgrade → downgrade → upgrade
+round-trip on a throwaway SQLite file. Production PostgreSQL is never touched
+by the test suite.
 
 ## Configuration
 
