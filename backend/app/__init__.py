@@ -7,10 +7,12 @@ registers API blueprints.
 from flask import Flask
 from flask_cors import CORS
 
+from .cli import register_commands
 from .config import ProductionConfig, get_config
 from .extensions import db, jwt, limiter, ma, mail, migrate
 from .routes import register_blueprints
 from .utils.errors import register_error_handlers
+from . import models  # noqa: F401  (registers all models with SQLAlchemy)
 
 
 def create_app(config_override: str | None = None) -> Flask:
@@ -46,5 +48,8 @@ def create_app(config_override: str | None = None) -> Flask:
 
     # Register API blueprints
     register_blueprints(app)
+
+    # Register CLI commands
+    register_commands(app)
 
     return app
