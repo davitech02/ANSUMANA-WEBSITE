@@ -8,11 +8,14 @@ from .auth import (
     ResetPasswordSchema,
     UserSchema,
 )
+from .public import PublicBookingSchema, PublicServiceRequestSchema
 
 __all__ = [
     "ForgotPasswordSchema",
     "LoginSchema",
     "ProponentSchema",
+    "PublicBookingSchema",
+    "PublicServiceRequestSchema",
     "RegisterSchema",
     "ResetPasswordSchema",
     "UserSchema",

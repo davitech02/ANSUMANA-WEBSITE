@@ -124,6 +124,15 @@ class Config:
         "AUTH_RESET_PASSWORD_RATE", "10 per hour"
     )
 
+    # Public (unauthenticated) endpoints rate limits (per client IP)
+    PUBLIC_BOOKINGS_RATE = os.environ.get("PUBLIC_BOOKINGS_RATE", "10 per hour")
+    PUBLIC_SERVICE_REQUESTS_RATE = os.environ.get(
+        "PUBLIC_SERVICE_REQUESTS_RATE", "10 per hour"
+    )
+    PUBLIC_PERMIT_STATUS_RATE = os.environ.get(
+        "PUBLIC_PERMIT_STATUS_RATE", "30 per minute"
+    )
+
     # Password reset
     PASSWORD_RESET_TOKEN_TTL = _env_int("PASSWORD_RESET_TOKEN_TTL", 1800)  # 30 min
     # Base URL used to build password-reset links (email delivery)

@@ -3,16 +3,18 @@
 Production-ready Flask backend for the AEC Compliance Portal React frontend.
 
 > **Status:** Foundation + tooling + models + PostgreSQL schema + seeding +
-> authentication + RBAC/ownership isolation. This establishes the application
-> skeleton, configuration, extensions, CORS, standardized response envelopes,
-> JSON error handlers, rate limiting, the full 14-table data model, the
-> PostgreSQL schema via Flask-Migrate, idempotent CLI seeding (`flask
+> authentication + RBAC/ownership isolation + public API. This establishes the
+> application skeleton, configuration, extensions, CORS, standardized response
+> envelopes, JSON error handlers, rate limiting, the full 14-table data model,
+> the PostgreSQL schema via Flask-Migrate, idempotent CLI seeding (`flask
 > create-admin`, `flask seed-demo`), the complete authentication API
 > (register, login, JWT access/refresh with rotation + blocklisting, logout,
-> `GET /me`, forgot/reset password, per-IP rate limiting, audit logging), and
-> the server-enforced authorization layer (admin/client role gates, proponent
+> `GET /me`, forgot/reset password, per-IP rate limiting, audit logging), the
+> server-enforced authorization layer (admin/client role gates, proponent
 > tenant isolation with 404-on-cross-tenant, SQL-level query scoping, derived
-> file ownership). No CRUD and no frontend integration yet.
+> file ownership), and the public (unauthenticated) API for consultation
+> bookings, service requests, and the permit status lookup. No CRUD and no
+> frontend integration yet.
 
 ## Tech Stack
 
@@ -211,6 +213,9 @@ Key decisions:
 | GET    | `/api/auth/me`         | Current user + proponent (Bearer access) |
 | POST   | `/api/auth/forgot-password` | Request a password reset link (public) |
 | POST   | `/api/auth/reset-password` | Set a new password with a reset token (public) |
+| POST   | `/api/public/bookings` | Submit a consultation booking (public) |
+| POST   | `/api/public/service-requests` | Submit a service request (public) |
+| GET    | `/api/public/permits/status` | Permit status lookup by number/company/email (public) |
 
 Example:
 
@@ -250,6 +255,40 @@ token **30 days**; the JWT identity is the user UUID with `role`,
   returned (audit-log contents are verified by tests).
 - Passwords are hashed with **scrypt**; the API never returns or exposes
   `password_hash`.
+
+## Public (Unauthenticated) API
+
+Three endpoints serve anonymous visitors and never require a JWT:
+
+- **`POST /api/public/bookings`** — consultation bookings. Accepts
+  `full_name`, `company_name`, `email`, `phone`, `whatsapp_number`,
+  `service_needed` (one of the `BookingService` values), `preferred_date`,
+  `preferred_time`, `project_location`, `message`. The server always records
+  the booking as `Pending` with `proponent_id`/`created_by` NULL and a NULL
+  `meeting_link` (the link is assigned by a consultant in a later phase).
+  Rate limit: `PUBLIC_BOOKINGS_RATE` (default 10/hour).
+- **`POST /api/public/service-requests`** — service requests. Accepts
+  `full_name`, `company_name`, `email`, `phone`, `whatsapp_number`,
+  `service_needed` (one of the `RequestService` values), `project_location`,
+  `message`. The server always records the request as `New` with
+  `proponent_id`/`created_by` NULL. Rate limit:
+  `PUBLIC_SERVICE_REQUESTS_RATE` (default 10/hour).
+- **`GET /api/public/permits/status?q=<term>`** — public permit status lookup
+  by permit number, proponent company name, or proponent email
+  (case-insensitive substring, mirroring the frontend status page). Returns
+  only a safe subset per permit (`permit_number`, `permit_type`,
+  `permit_status`, `expiry_date`, `proponent_name`, and the proponent's
+  schedules with `report_type`, `reporting_period`, `due_date`, `status`).
+  Contact details, internal ids, file paths, and audit metadata are never
+  exposed. Soft-deleted permits/proponents are hidden. Rate limit:
+  `PUBLIC_PERMIT_STATUS_RATE` (default 30/minute).
+
+Server-controlled fields (`booking_status`, `status`, `proponent_id`,
+`created_by`, `meeting_link`, timestamps) are never accepted from clients —
+any supplied values are silently dropped (`EXCLUDE`). All submissions run in a
+transaction with rollback on failure and write an audit entry
+(`public.booking`, `public.service_request`). No email or WhatsApp
+notifications are sent from these endpoints (delivery is a later phase).
 
 ## Authorization & Tenant Isolation
 
@@ -311,15 +350,18 @@ logout, password reset incl. expired/reused tokens and session invalidation,
 rate limiting, and secret-free audit logging), the RBAC/ownership matrix
 (role gates, cross-tenant 404 isolation, privilege escalation attempts,
 SQL-level scoping, derived file ownership, admin cross-tenant access, live
-user deactivation), and a full migration upgrade → downgrade → upgrade
-round-trip on a throwaway SQLite file. Production PostgreSQL is never touched
-by the test suite.
+user deactivation), the public API (booking/service-request submission with
+validation and server-controlled status enforcement, transaction rollback,
+rate limiting, safe permit-status lookup incl. soft-delete filtering and
+sensitive-field protection), and a full migration upgrade → downgrade →
+upgrade round-trip on a throwaway SQLite file. Production PostgreSQL is never
+touched by the test suite.
 
 ## Configuration
 
 All configuration is driven by environment variables. See `.env.example` for
 the full list (JWT settings incl. the header transport mode, auth rate limits,
-password-reset TTL and frontend base URL, uploads, SMTP mail, WhatsApp, rate
-limiting, `AEC_ADMIN_PASSWORD`, `AEC_DEMO_PASSWORD`). Production configuration
-validates that required secrets and origins are present and refuses a wildcard
-`CORS_ORIGINS`.
+public-API rate limits, password-reset TTL and frontend base URL, uploads,
+SMTP mail, WhatsApp, rate limiting, `AEC_ADMIN_PASSWORD`,
+`AEC_DEMO_PASSWORD`). Production configuration validates that required secrets
+and origins are present and refuses a wildcard `CORS_ORIGINS`.
