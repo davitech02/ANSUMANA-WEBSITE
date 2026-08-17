@@ -8,15 +8,16 @@ and unique at the database level.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from ..extensions import db
 from ..utils.text import normalize_email
 from .enums import UserRole, values_callable
-from .mixins import TimestampMixin, UUIDPrimaryKeyMixin
+from .mixins import TimestampMixin, UTCDateTime, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from .audit_log import AuditLog
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from .password_reset_token import PasswordResetToken
     from .proponent import Proponent
     from .service_request import ServiceRequest
+    from .token_blocklist import TokenBlocklist
 
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, db.Model):
@@ -59,6 +61,14 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, db.Model):
         nullable=True,
         index=True,
     )
+    # Timestamp of the most recent successful login (NULL until first login).
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime, nullable=True
+    )
+    # Incremented whenever a password changes. All previously issued JWT
+    # access/refresh tokens carry a matching claim, so bumping this value
+    # invalidates every outstanding session in one step.
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     proponent: Mapped["Proponent | None"] = relationship(
         "Proponent", back_populates="users"
@@ -87,6 +97,9 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, db.Model):
         "PasswordResetToken",
         back_populates="user",
         cascade="all, delete-orphan",
+    )
+    blocklisted_tokens: Mapped[list["TokenBlocklist"]] = relationship(
+        "TokenBlocklist", back_populates="user", passive_deletes=True
     )
 
     @validates("email")

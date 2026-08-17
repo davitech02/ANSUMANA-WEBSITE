@@ -13,6 +13,7 @@ from .extensions import db, jwt, limiter, ma, mail, migrate
 from .routes import register_blueprints
 from .utils.errors import register_error_handlers
 from . import models  # noqa: F401  (registers all models with SQLAlchemy)
+from . import auth  # noqa: F401  (registers JWT callbacks with the JWT manager)
 
 
 def create_app(config_override: str | None = None) -> Flask:

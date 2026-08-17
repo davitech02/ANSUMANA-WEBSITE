@@ -2,12 +2,15 @@
 
 Production-ready Flask backend for the AEC Compliance Portal React frontend.
 
-> **Status:** Foundation + tooling + models + PostgreSQL schema + seeding.
-> No auth, no CRUD, no frontend integration yet. This establishes the
-> application skeleton, configuration, extensions, CORS, standardized response
-> envelopes, JSON error handlers, rate limiting, the full 14-table data model,
-> the PostgreSQL schema via Flask-Migrate, and idempotent CLI seeding
-> (`flask create-admin`, `flask seed-demo`).
+> **Status:** Foundation + tooling + models + PostgreSQL schema + seeding +
+> authentication. This establishes the application skeleton, configuration,
+> extensions, CORS, standardized response envelopes, JSON error handlers, rate
+> limiting, the full 14-table data model, the PostgreSQL schema via
+> Flask-Migrate, idempotent CLI seeding (`flask create-admin`,
+> `flask seed-demo`), and the complete authentication API (register, login,
+> JWT access/refresh with rotation + blocklisting, logout, `GET /me`,
+> forgot/reset password, per-IP rate limiting, audit logging). No CRUD and no
+> frontend integration yet.
 
 ## Tech Stack
 
@@ -37,8 +40,8 @@ backend/
 │   ├── config.py          # environment-based configuration
 │   ├── extensions.py      # db, migrate, jwt extension instances
 │   ├── models/            # SQLAlchemy models (users, proponents, permits, ...)
-│   ├── routes/            # API blueprints (health, ...)
-│   ├── services/          # business logic (added later)
+│   ├── routes/            # API blueprints (health, auth, ...)
+│   ├── services/          # business logic (auth_service, audit_service, ...)
 │   └── utils/             # response envelope + error handlers
 ├── migrations/            # Flask-Migrate migrations (initial schema applied)
 ├── tests/                 # pytest tests
@@ -195,9 +198,16 @@ Key decisions:
 
 ## Endpoints
 
-| Method | Path         | Description                |
-|--------|--------------|----------------------------|
-| GET    | `/api/health`| Health check (public)      |
+| Method | Path                   | Description                          |
+|--------|------------------------|--------------------------------------|
+| GET    | `/api/health`          | Health check (public)                |
+| POST   | `/api/auth/register`   | Create a client account (public)     |
+| POST   | `/api/auth/login`      | Authenticate, issue token pair (public) |
+| POST   | `/api/auth/refresh`    | Rotate a refresh token (Bearer refresh) |
+| POST   | `/api/auth/logout`     | Revoke access + optional refresh (Bearer access) |
+| GET    | `/api/auth/me`         | Current user + proponent (Bearer access) |
+| POST   | `/api/auth/forgot-password` | Request a password reset link (public) |
+| POST   | `/api/auth/reset-password` | Set a new password with a reset token (public) |
 
 Example:
 
@@ -205,6 +215,38 @@ Example:
 curl http://localhost:5000/api/health
 # {"status":"success","data":{"service":"aec-compliance-api"},"message":"API is running"}
 ```
+
+## Authentication
+
+Registration always creates a `client` role account (a client-supplied `role`
+is silently ignored). A `company_name` in the register body also creates the
+proponent (using only the registrant's real data) and links the account to it.
+
+Tokens are **HS256** signed, carried in the `Authorization: Bearer <token>`
+header, and returned in JSON bodies (cookie transport is reserved for the
+frontend-integration phase). The access token lives **60 minutes**, the refresh
+token **30 days**; the JWT identity is the user UUID with `role`,
+`proponent_id`, `email`, and `token_version` claims.
+
+- **Per-request user resolution** — every protected call reloads the user from
+  the database; deactivated accounts and bumped `token_version` values are
+  rejected immediately, regardless of what an old token claims.
+- **Refresh rotation** — each use of a refresh token revokes it and issues a
+  fresh pair; replayed old refresh tokens are rejected.
+- **Blocklisting** — logout (and rotation) revoke the JTI; revoked tokens are
+  rejected even before expiry.
+- **Password reset** — `forgot-password` always returns the same generic
+  message (anti-enumeration); the 30-minute reset token is stored only as a
+  SHA-256 hash, is single-use, invalidates previous tokens, and resetting
+  bumps `token_version` to invalidate every existing session.
+- **Rate limiting** — per-IP limits on login (5/min), registration (10/hour),
+  forgot-password (5/hour), and reset-password (10/hour).
+- **Auditing** — `auth.register`, `auth.login`, `auth.logout`, `auth.refresh`,
+  `auth.forgot`, and `auth.reset` events are recorded with the actor, entity,
+  IP, and user agent. Passwords, hashes, and tokens are never logged or
+  returned (audit-log contents are verified by tests).
+- Passwords are hashed with **scrypt**; the API never returns or exposes
+  `password_hash`.
 
 ## Response Envelope
 
@@ -226,14 +268,18 @@ pytest
 
 Tests use an in-memory SQLite database (or `TEST_DATABASE_URL` if set) and
 cover the health endpoint, response envelope, all 14 models, the CLI commands
-(idempotency/safety), and a full migration upgrade → downgrade → upgrade
-round-trip on a throwaway SQLite file. Production PostgreSQL is never touched
-by the test suite.
+(idempotency/safety), the complete auth API (registration, login, JWT
+issuance/expiry/invalid tokens, refresh rotation + reuse rejection, blocklisted
+logout, password reset incl. expired/reused tokens and session invalidation,
+rate limiting, and secret-free audit logging), and a full migration
+upgrade → downgrade → upgrade round-trip on a throwaway SQLite file.
+Production PostgreSQL is never touched by the test suite.
 
 ## Configuration
 
 All configuration is driven by environment variables. See `.env.example` for
-the full list (JWT cookie flags, uploads, SMTP mail, WhatsApp, rate limiting,
-`AEC_ADMIN_PASSWORD`, `AEC_DEMO_PASSWORD`). Production configuration validates
-that required secrets and origins are present and refuses a wildcard
+the full list (JWT settings incl. the header transport mode, auth rate limits,
+password-reset TTL and frontend base URL, uploads, SMTP mail, WhatsApp, rate
+limiting, `AEC_ADMIN_PASSWORD`, `AEC_DEMO_PASSWORD`). Production configuration
+validates that required secrets and origins are present and refuses a wildcard
 `CORS_ORIGINS`.

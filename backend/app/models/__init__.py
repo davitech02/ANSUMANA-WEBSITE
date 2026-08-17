@@ -38,6 +38,7 @@ from .permit import Permit
 from .proponent import Proponent
 from .report_schedule import ReportSchedule
 from .service_request import ServiceRequest
+from .token_blocklist import TokenBlocklist
 from .user import User
 
 __all__ = [
@@ -72,6 +73,7 @@ __all__ = [
     "ReviewStatus",
     "RiskLevel",
     "ServiceRequest",
+    "TokenBlocklist",
     "User",
     "UserRole",
 ]

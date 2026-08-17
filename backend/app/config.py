@@ -70,8 +70,12 @@ class Config:
         "JWT_REFRESH_TOKEN_EXPIRES", 30 * 24 * 3600
     )  # 30 days
 
-    # JWT cookie transport (auth phase)
-    JWT_TOKEN_LOCATION = ["cookies"]
+    # JWT token transport. Phase 4 uses bearer tokens in the Authorization
+    # header; the access/refresh tokens are returned in JSON bodies. The cookie
+    # transport flags below (aec_access / aec_refresh + CSRF) are reserved for
+    # the frontend-integration phase and are inert while
+    # JWT_TOKEN_LOCATION == ["headers"].
+    JWT_TOKEN_LOCATION = ["headers"]
     JWT_COOKIE_NAME = "aec_access"
     JWT_REFRESH_COOKIE_NAME = "aec_refresh"
     JWT_COOKIE_SECURE = _env_bool("JWT_COOKIE_SECURE", False)
@@ -105,9 +109,25 @@ class Config:
     WHATSAPP_SENDER_PHONE = os.environ.get("WHATSAPP_SENDER_PHONE", "")
 
     # Rate limiting (Flask-Limiter)
+    RATELIMIT_ENABLED = _env_bool("RATELIMIT_ENABLED", True)
     RATELIMIT_DEFAULT = os.environ.get("RATELIMIT_DEFAULT", "200 per hour")
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = _env_bool("RATELIMIT_HEADERS_ENABLED", False)
+
+    # Authentication rate limits (per client IP)
+    AUTH_LOGIN_RATE = os.environ.get("AUTH_LOGIN_RATE", "5 per minute")
+    AUTH_REGISTER_RATE = os.environ.get("AUTH_REGISTER_RATE", "10 per hour")
+    AUTH_FORGOT_PASSWORD_RATE = os.environ.get(
+        "AUTH_FORGOT_PASSWORD_RATE", "5 per hour"
+    )
+    AUTH_RESET_PASSWORD_RATE = os.environ.get(
+        "AUTH_RESET_PASSWORD_RATE", "10 per hour"
+    )
+
+    # Password reset
+    PASSWORD_RESET_TOKEN_TTL = _env_int("PASSWORD_RESET_TOKEN_TTL", 1800)  # 30 min
+    # Base URL used to build password-reset links (email delivery)
+    FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000")
 
 
 class DevelopmentConfig(Config):
@@ -137,6 +157,20 @@ class TestingConfig(Config):
         "TEST_DATABASE_URL", "sqlite:///:memory:"
     )
     CORS_ORIGINS = _env_list("CORS_ORIGINS", "http://localhost:3000")
+    # Rate limiting is disabled so the suite is deterministic and not flaky.
+    # The rate-limiting test enables it explicitly.
+    RATELIMIT_ENABLED = False
+
+
+class TestingRateLimitConfig(TestingConfig):
+    """Test configuration with Flask-Limiter active.
+
+    Flask-Limiter only registers its request hooks during ``init_app`` when
+    rate limiting is enabled, so the rate-limit test creates its app with this
+    class instead of toggling ``enabled`` at runtime.
+    """
+
+    RATELIMIT_ENABLED = True
 
 
 class ProductionConfig(Config):
@@ -171,6 +205,7 @@ class ProductionConfig(Config):
 config_by_name: dict[str, type[Config]] = {
     "development": DevelopmentConfig,
     "testing": TestingConfig,
+    "testing_ratelimit": TestingRateLimitConfig,
     "production": ProductionConfig,
 }
 

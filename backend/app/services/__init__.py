@@ -1,4 +1,7 @@
-"""Business logic / service layer package.
+"""Business services package.
 
-Service modules will be added in a later step as endpoints grow.
+Services hold the domain logic used by route handlers. Route modules stay
+thin and delegate to services here.
 """
+
+from . import auth_service, audit_service  # noqa: F401
