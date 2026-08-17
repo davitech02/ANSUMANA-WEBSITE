@@ -14,6 +14,8 @@ from flask import Blueprint, g, request, send_file
 
 from ..authorization import client_required
 from ..schemas import (
+    ClientEvidenceDetailSchema,
+    ClientEvidenceSchema,
     ClientFindingSchema,
     ClientPermitSchema,
     ClientReminderSchema,
@@ -138,4 +140,58 @@ def list_reminders():
             "items": ClientReminderSchema(many=True).dump(logs),
             "count": len(logs),
         }
+    )
+
+
+@client_bp.get("/evidence")
+@client_required
+def list_evidence():
+    """Return the client's own evidence, newest first."""
+    items = client_service.list_evidence(g.current_user)
+    return success(
+        data={
+            "items": ClientEvidenceSchema(many=True).dump(items),
+            "count": len(items),
+        }
+    )
+
+
+@client_bp.get("/evidence/<uuid:evidence_id>")
+@client_required
+def get_evidence(evidence_id):
+    """Return one of the client's own evidence records with file context."""
+    evidence = client_service.get_evidence(g.current_user, evidence_id)
+    return success(data=ClientEvidenceDetailSchema().dump(evidence))
+
+
+@client_bp.post("/evidence")
+@client_required
+def upload_evidence():
+    """Upload evidence against one of the client's own findings."""
+    evidence = client_service.upload_evidence(
+        g.current_user,
+        request.form.to_dict(),
+        request.files.get("file"),
+        request,
+    )
+    return success(
+        data=ClientEvidenceDetailSchema().dump(evidence),
+        message="Evidence uploaded successfully.",
+        status=201,
+    )
+
+
+@client_bp.get("/evidence/<uuid:evidence_id>/file")
+@client_required
+def evidence_file(evidence_id):
+    """Stream the file attached to one of the client's own evidence records."""
+    file = client_service.get_evidence_file(g.current_user, evidence_id)
+    path = client_service.resolve_file_path(file)
+    if not os.path.isfile(path):
+        raise ApiError("Resource not found.", status_code=404, code="not_found")
+    return send_file(
+        path,
+        mimetype=file.mime_type,
+        as_attachment=True,
+        download_name=file.original_name,
     )

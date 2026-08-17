@@ -10,6 +10,11 @@ from .auth import (
 )
 from .client import (
     ClientCompanyUpdateSchema,
+    ClientEvidenceDetailSchema,
+    ClientEvidenceFileSchema,
+    ClientEvidenceFindingSchema,
+    ClientEvidenceSchema,
+    ClientEvidenceUploadSchema,
     ClientFindingSchema,
     ClientPermitSchema,
     ClientReminderSchema,
@@ -19,6 +24,11 @@ from .public import PublicBookingSchema, PublicServiceRequestSchema
 
 __all__ = [
     "ClientCompanyUpdateSchema",
+    "ClientEvidenceDetailSchema",
+    "ClientEvidenceFileSchema",
+    "ClientEvidenceFindingSchema",
+    "ClientEvidenceSchema",
+    "ClientEvidenceUploadSchema",
     "ClientFindingSchema",
     "ClientPermitSchema",
     "ClientReminderSchema",

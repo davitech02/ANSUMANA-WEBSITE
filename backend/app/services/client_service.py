@@ -9,6 +9,7 @@ a transaction with rollback on failure and are audited.
 from __future__ import annotations
 
 import os
+import uuid
 from datetime import date
 
 from flask import Request, current_app
@@ -17,18 +18,51 @@ from marshmallow import ValidationError
 from ..authorization import require_proponent, scoped_query
 from ..extensions import db
 from ..models import (
+    Evidence,
     File,
+    FileCategory,
     Finding,
     NotificationLog,
     Permit,
     Proponent,
     ReportSchedule,
+    ReviewStatus,
     User,
 )
-from ..schemas import ClientCompanyUpdateSchema
+from ..models.mixins import utcnow
+from ..schemas import (
+    ClientCompanyUpdateSchema,
+    ClientEvidenceUploadSchema,
+)
 from ..utils.errors import ApiError
 from ..utils.text import normalize_email
 from .audit_service import record_audit
+
+ALLOWED_EVIDENCE_EXTENSIONS = frozenset(
+    {".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".doc", ".docx"}
+)
+ALLOWED_EVIDENCE_MIME_TYPES = frozenset(
+    {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+)
+EVIDENCE_SUBDIR = "evidence"
+
+
+def _validation_error(errors: dict) -> ApiError:
+    """Build a standard 400 validation error envelope."""
+    return ApiError(
+        "Validation failed.",
+        status_code=400,
+        code="validation_error",
+        data={"errors": errors},
+    )
 
 
 def _load(data: dict, schema_cls):
@@ -204,3 +238,152 @@ def list_reminders(user: User):
         .order_by(NotificationLog.created_at.desc(), NotificationLog.id.desc())
         .all()
     )
+
+
+# --------------------------------------------------------------------------- #
+# Phase 8: Evidence & files
+# --------------------------------------------------------------------------- #
+
+def list_evidence(user: User):
+    """Return the client's own evidence (never another tenant's).
+
+    Scoped at the SQL level and ordered deterministically. A client without a
+    proponent receives an empty list (a NULL-scoped query would be unsafe).
+    """
+    if user.proponent_id is None:
+        return []
+    return (
+        scoped_query(Evidence, user.proponent_id)
+        .filter(Evidence.is_deleted.is_(False))
+        .order_by(Evidence.created_at.desc(), Evidence.id.desc())
+        .all()
+    )
+
+
+def get_evidence(user: User, evidence_id) -> Evidence:
+    """Resolve one of the client's own evidence records.
+
+    Cross-tenant, nonexistent, and soft-deleted records are all 404 so other
+    tenants' data is never enumerable.
+    """
+    if user.proponent_id is None:
+        raise ApiError("Resource not found.", status_code=404, code="not_found")
+    evidence = require_proponent(Evidence, evidence_id)
+    if evidence.is_deleted:
+        raise ApiError("Resource not found.", status_code=404, code="not_found")
+    return evidence
+
+
+def get_evidence_file(user: User, evidence_id) -> File:
+    """Resolve the file attached to one of the client's own evidence records.
+
+    The file is reachable only through a tenant-owned evidence record; an
+    arbitrary file id can never authorize access.
+    """
+    evidence = get_evidence(user, evidence_id)
+    if evidence.file_id is None:
+        raise ApiError("Resource not found.", status_code=404, code="not_found")
+    file = db.session.get(File, evidence.file_id)
+    if file is None:
+        raise ApiError("Resource not found.", status_code=404, code="not_found")
+    return file
+
+
+def _sanitize_original_name(filename: str, fallback_ext: str) -> str:
+    """Return a display-safe original filename (basename, no path/control chars)."""
+    name = os.path.basename((filename or "").replace("\\", "/"))
+    name = "".join(ch for ch in name if ch not in "\r\n\x00")
+    name = name.strip()
+    if not name:
+        return f"evidence-{uuid.uuid4().hex[:8]}{fallback_ext}"
+    return name[:255]
+
+
+def _remove_quietly(path: str) -> None:
+    """Best-effort removal of a partially written upload file."""
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
+def upload_evidence(user: User, form: dict, uploaded_file, request: Request) -> Evidence:
+    """Upload evidence for one of the client's own findings.
+
+    Ownership (``proponent_id``) and the uploader (``uploaded_by``) are always
+    derived server-side; the finding must belong to the client's proponent
+    (404 otherwise). The stored filename and storage path are generated
+    server-side; the physical write and the database transaction are atomic:
+    on any failure the partially written file is removed and no dangling
+    ``Evidence``/``File`` row is left behind.
+    """
+    proponent = _proponent_or_404(user)
+    data = _load(form, ClientEvidenceUploadSchema)
+    finding = require_proponent(Finding, data["finding_id"])
+    if finding.is_deleted:
+        raise ApiError("Resource not found.", status_code=404, code="not_found")
+
+    if uploaded_file is None or not (uploaded_file.filename or "").strip():
+        raise _validation_error({"file": ["A file is required."]})
+
+    original_name = uploaded_file.filename
+    ext = os.path.splitext(original_name)[1].lower()
+    if ext not in ALLOWED_EVIDENCE_EXTENSIONS:
+        raise _validation_error({"file": ["Unsupported file type."]})
+
+    mime = (uploaded_file.mimetype or "").lower()
+    if mime and mime not in ALLOWED_EVIDENCE_MIME_TYPES:
+        raise _validation_error({"file": ["Unsupported file content type."]})
+
+    display_name = _sanitize_original_name(original_name, ext)
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+
+    upload_root = current_app.config["UPLOAD_DIR"]
+    abs_dir = os.path.join(upload_root, EVIDENCE_SUBDIR)
+    os.makedirs(abs_dir, exist_ok=True)
+    abs_path = os.path.join(abs_dir, stored_name)
+    try:
+        uploaded_file.save(abs_path)
+    except Exception:
+        _remove_quietly(abs_path)
+        raise
+
+    try:
+        file_record = File(
+            original_name=display_name,
+            stored_name=stored_name,
+            storage_path=os.path.join(EVIDENCE_SUBDIR, stored_name),
+            mime_type=mime or "application/octet-stream",
+            size_bytes=os.path.getsize(abs_path),
+            category=FileCategory.EVIDENCE,
+            uploaded_by=user.id,
+        )
+        db.session.add(file_record)
+        db.session.flush()
+
+        evidence = Evidence(
+            finding_id=finding.id,
+            proponent_id=proponent.id,
+            file_id=file_record.id,
+            evidence_title=data["evidence_title"],
+            description=data.get("description"),
+            review_status=ReviewStatus.PENDING_REVIEW,
+            submitted_at=utcnow(),
+        )
+        db.session.add(evidence)
+        db.session.flush()
+
+        record_audit(
+            "client.evidence.upload",
+            user_id=user.id,
+            entity_type="evidence",
+            entity_id=str(evidence.id),
+            request=request,
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        _remove_quietly(abs_path)
+        raise
+    return evidence
