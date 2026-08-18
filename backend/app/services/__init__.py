@@ -12,4 +12,5 @@ from . import (
     client_service,
     notification_service,
     public_service,
+    reminder_service,
 )  # noqa: F401

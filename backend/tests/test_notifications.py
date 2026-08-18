@@ -413,6 +413,8 @@ def test_template_known_event_types():
             "finding_verified",
             "evidence_reviewed",
             "report_reminder",
+            "report_due",
+            "report_overdue",
         }
     )
 

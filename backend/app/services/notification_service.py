@@ -166,13 +166,19 @@ def dispatch_event(
     whatsapp_recipient: str | None = None,
     context: dict | None = None,
     reminder_days: int | None = None,
-) -> None:
+) -> list[dict]:
     """Dispatch a notification event to both channels (when enabled).
 
     Never raises: the caller's transaction has already committed and any
     delivery problem must not fail the caller. Per-call dedupe guarantees each
     channel is sent at most once.
+
+    Returns a per-channel outcome list, each item shaped
+    ``{"channel": "Email"|"WhatsApp", "status": "sent"|"failed"|"skipped",
+    "recipient": str|None, "reason": str|None}`` so callers (e.g. the reminder
+    engine) can aggregate delivery results without touching providers.
     """
+    outcomes: list[dict] = []
     try:
         proponent = (
             db.session.get(Proponent, proponent_id) if proponent_id else None
@@ -187,14 +193,30 @@ def dispatch_event(
             (_EMAIL, email_recipient),
             (_WHATSAPP, whatsapp_recipient),
         ):
-            if channel in sent or not _channel_enabled(
-                channel, reminder_days=reminder_days
-            ):
+            if channel in sent:
+                continue
+            if not _channel_enabled(channel, reminder_days=reminder_days):
+                outcomes.append(
+                    {
+                        "channel": channel.value,
+                        "status": "skipped",
+                        "recipient": None,
+                        "reason": "disabled",
+                    }
+                )
                 continue
             recipient = _recipient(channel, proponent, explicit)
             if not recipient:
+                outcomes.append(
+                    {
+                        "channel": channel.value,
+                        "status": "skipped",
+                        "recipient": None,
+                        "reason": "no_recipient",
+                    }
+                )
                 continue
-            _dispatch_channel(
+            status = _dispatch_channel(
                 channel,
                 notification_type=notification_type,
                 proponent_id=proponent_id,
@@ -204,11 +226,47 @@ def dispatch_event(
                 subject=subject,
                 body_text=body_text,
             )
+            outcomes.append(
+                {
+                    "channel": channel.value,
+                    "status": status,
+                    "recipient": recipient,
+                    "reason": None,
+                }
+            )
             sent.add(channel)
     except Exception:
         current_app.logger.exception(
             "Notification dispatch failed for event '%s'.", event_type
         )
+    return outcomes
+
+
+def channel_eligible(
+    channel: NotificationChannel,
+    *,
+    proponent=None,
+    reminder_days: int | None = None,
+) -> tuple[bool, str]:
+    """Return ``(eligible, reason)`` for a channel without sending anything.
+
+    Mirrors the dispatch-time checks: the ``EMAIL_ENABLED``/``WHATSAPP_ENABLED``
+    config gates, the ``CompanySettings`` channel toggles, the optional
+    ``reminder_<days>_enabled`` flag, and recipient availability. Used by
+    callers that must preview delivery (e.g. dry-run reminder execution)
+    without persisting logs or contacting providers.
+    """
+    if not _channel_enabled(channel, reminder_days=reminder_days):
+        return False, "disabled"
+    if proponent is not None:
+        recipient = (
+            proponent.email
+            if channel == _EMAIL
+            else proponent.whatsapp_number
+        )
+        if not recipient:
+            return False, "no_recipient"
+    return True, "ok"
 
 
 def _dispatch_channel(
@@ -221,11 +279,13 @@ def _dispatch_channel(
     recipient: str,
     subject: str,
     body_text: str,
-) -> None:
+) -> str:
     """Persist a Pending log, deliver, then record the outcome.
 
     The Pending row is committed before the provider is contacted so the
     attempt is never lost and no external call happens inside a transaction.
+
+    Returns the final delivery status ("sent" or "failed").
     """
     log = NotificationLog(
         proponent_id=proponent_id,
@@ -243,6 +303,16 @@ def _dispatch_channel(
 
     result = _deliver(log)
     _record_outcome(log, result)
+    return "sent" if result.success else "failed"
+
+
+def _report_context(proponent: "Proponent", schedule: "ReportSchedule") -> dict:
+    return {
+        "name": proponent.contact_person or proponent.company_name,
+        "report_type": schedule.report_type.value,
+        "reporting_period": schedule.reporting_period,
+        "due_date": schedule.due_date.isoformat(),
+    }
 
 
 def dispatch_report_reminder(
@@ -250,24 +320,52 @@ def dispatch_report_reminder(
     schedule: "ReportSchedule",
     *,
     days: int,
-) -> None:
+) -> list[dict]:
     """Dispatch a report-reminder event for a schedule.
 
     Respects the matching ``reminder_<days>_enabled`` toggle in addition to
-    the channel gates.
+    the channel gates. Returns the per-channel outcome list.
     """
-    dispatch_event(
+    return dispatch_event(
         event_type="report_reminder",
         notification_type=NotificationType.REPORT_REMINDER,
         proponent_id=proponent.id,
         report_schedule_id=schedule.id,
-        context={
-            "name": proponent.contact_person or proponent.company_name,
-            "report_type": schedule.report_type.value,
-            "reporting_period": schedule.reporting_period,
-            "due_date": schedule.due_date.isoformat(),
-        },
+        context=_report_context(proponent, schedule),
         reminder_days=days,
+    )
+
+
+def dispatch_report_due(
+    proponent: "Proponent", schedule: "ReportSchedule"
+) -> list[dict]:
+    """Dispatch a report-due-today event for a schedule.
+
+    Delivered on the schedule's exact due date (``reminder_due_sent`` flag).
+    """
+    return dispatch_event(
+        event_type="report_due",
+        notification_type=NotificationType.REPORT_REMINDER,
+        proponent_id=proponent.id,
+        report_schedule_id=schedule.id,
+        context=_report_context(proponent, schedule),
+    )
+
+
+def dispatch_report_overdue(
+    proponent: "Proponent", schedule: "ReportSchedule"
+) -> list[dict]:
+    """Dispatch a report-overdue notice for a schedule.
+
+    Delivered once a schedule passes its due date (``reminder_overdue_sent``
+    flag) using the ``OVERDUE_NOTICE`` notification type.
+    """
+    return dispatch_event(
+        event_type="report_overdue",
+        notification_type=NotificationType.OVERDUE_NOTICE,
+        proponent_id=proponent.id,
+        report_schedule_id=schedule.id,
+        context=_report_context(proponent, schedule),
     )
 
 
@@ -357,7 +455,10 @@ def retry_notification(
 
 __all__ = [
     "attempt_number",
+    "channel_eligible",
     "dispatch_event",
+    "dispatch_report_due",
+    "dispatch_report_overdue",
     "dispatch_report_reminder",
     "retry_notification",
 ]

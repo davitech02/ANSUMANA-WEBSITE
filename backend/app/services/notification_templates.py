@@ -70,6 +70,23 @@ _TEMPLATES: dict[str, dict[str, str]] = {
             "your report on time to stay compliant."
         ),
     },
+    "report_due": {
+        "subject": "Report due today",
+        "body": (
+            "Hello {{ name }}, your {{ report_type }} for the period "
+            "{{ reporting_period }} is due today ({{ due_date }}). Please "
+            "submit your report today to stay compliant."
+        ),
+    },
+    "report_overdue": {
+        "subject": "Report overdue",
+        "body": (
+            "Hello {{ name }}, your {{ report_type }} for the period "
+            "{{ reporting_period }} was due on {{ due_date }} and is now "
+            "overdue. Please contact AEC to arrange submission and avoid "
+            "regulatory sanctions."
+        ),
+    },
 }
 
 _PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_]+)\s*\}\}")

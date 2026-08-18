@@ -8,6 +8,7 @@ variable or an interactive prompt.
 from __future__ import annotations
 
 import getpass
+import json
 import os
 import secrets
 from datetime import datetime, timezone
@@ -492,6 +493,27 @@ def seed_demo_command(force) -> None:
         )
 
 
+@click.command("run-reminders")
+@click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    help="Preview what would be sent without claiming flags or dispatching",
+)
+@with_appcontext
+def run_reminders_command(dry_run) -> None:
+    """Run the automated reminder engine (scheduler entry point).
+
+    Suitable for invocation by an external scheduler (e.g. a cron/Windows
+    Task Scheduler line ``flask run-reminders``). Prints the aggregated run
+    summary as JSON.
+    """
+    from .services import reminder_service
+
+    summary = reminder_service.run_reminders(dry_run=dry_run)
+    click.echo(json.dumps(summary, indent=2))
+
+
 def _clear_demo_data() -> None:
     """Delete demo-managed rows in reverse dependency order."""
     NotificationLog.query.delete()
@@ -511,3 +533,4 @@ def register_commands(app) -> None:
     """Register CLI commands on the Flask application."""
     app.cli.add_command(create_admin_command)
     app.cli.add_command(seed_demo_command)
+    app.cli.add_command(run_reminders_command)

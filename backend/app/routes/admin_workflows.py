@@ -24,7 +24,7 @@ from ..schemas import (
     PermitResponseSchema,
     ServiceRequestResponseSchema,
 )
-from ..services import admin_workflow_service, notification_service
+from ..services import admin_workflow_service, notification_service, reminder_service
 from ..utils.errors import ApiError
 from ..utils.response import normalize_per_page, paginate, success
 
@@ -238,6 +238,34 @@ def retry_notification(log_id):
             "attempt": attempt,
         },
         message="Notification retry recorded.",
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Reminder engine
+# --------------------------------------------------------------------------- #
+
+@admin_workflows_bp.post("/reminders/run")
+@admin_required
+def run_reminders():
+    """Execute the automated reminder engine (admin-only).
+
+    Body ``{"dry_run": true}`` previews what would be sent without claiming
+    reminder flags or dispatching anything. The run is audited as
+    ``admin.reminders.run`` with the authenticated admin as actor; the
+    returned summary contains only aggregate counts, never recipients or
+    secrets.
+    """
+    payload = request.get_json(silent=True) or {}
+    dry_run = payload.get("dry_run") is True
+    summary = reminder_service.run_reminders(
+        dry_run=dry_run,
+        actor=g.current_user,
+        request=request,
+    )
+    return success(
+        data=summary,
+        message="Reminder run completed.",
     )
 
 
