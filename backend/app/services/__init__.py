@@ -10,5 +10,6 @@ from . import (
     auth_service,
     audit_service,
     client_service,
+    notification_service,
     public_service,
 )  # noqa: F401

@@ -24,7 +24,7 @@ from ..schemas import (
     PermitResponseSchema,
     ServiceRequestResponseSchema,
 )
-from ..services import admin_workflow_service
+from ..services import admin_workflow_service, notification_service
 from ..utils.errors import ApiError
 from ..utils.response import normalize_per_page, paginate, success
 
@@ -216,6 +216,28 @@ def list_notification_logs():
         data=_paginated(
             NotificationLogResponseSchema(many=True).dump(items), total, page, per_page
         )
+    )
+
+
+@admin_workflows_bp.post("/notification-logs/<uuid:log_id>/retry")
+@admin_required
+def retry_notification(log_id):
+    """Record a new delivery attempt for a failed/pending notification.
+
+    Only the authenticated admin may retry. A ``Sent`` log returns 400
+    ``not_retryable``; the retry budget (``NOTIFICATION_MAX_RETRIES``) is
+    enforced server-side. Each retry creates a fresh NotificationLog row so
+    the delivery audit trail is append-only.
+    """
+    log, attempt = notification_service.retry_notification(
+        log_id, g.current_user, request
+    )
+    return success(
+        data={
+            "notification": NotificationLogResponseSchema().dump(log),
+            "attempt": attempt,
+        },
+        message="Notification retry recorded.",
     )
 
 

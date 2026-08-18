@@ -108,6 +108,48 @@ class Config:
     WHATSAPP_API_TOKEN = os.environ.get("WHATSAPP_API_TOKEN", "")
     WHATSAPP_SENDER_PHONE = os.environ.get("WHATSAPP_SENDER_PHONE", "")
 
+    # Notifications (Phase 11 - Email + WhatsApp delivery)
+    # Channels are disabled by default so nothing is ever sent (or logged)
+    # until an environment explicitly enables them.
+    EMAIL_ENABLED = _env_bool("EMAIL_ENABLED", False)
+    WHATSAPP_ENABLED = _env_bool("WHATSAPP_ENABLED", False)
+    # Outbound send timeout (seconds) and automatic max retry budget. The
+    # retry budget bounds re-attempts at the service level; each delivery
+    # still creates its own NotificationLog row.
+    NOTIFICATION_TIMEOUT = _env_int("NOTIFICATION_TIMEOUT", 15)
+    NOTIFICATION_MAX_RETRIES = _env_int("NOTIFICATION_MAX_RETRIES", 3)
+
+    # Email provider. SMTP_* are the primary keys; MAIL_* are accepted as
+    # compatibility aliases (Flask-Mail conventions).
+    SMTP_HOST = os.environ.get("SMTP_HOST", os.environ.get("MAIL_SERVER", ""))
+    SMTP_PORT = _env_int("SMTP_PORT", 587)
+    SMTP_USE_TLS = _env_bool("SMTP_USE_TLS", True)
+    SMTP_USE_SSL = _env_bool("SMTP_USE_SSL", False)
+    SMTP_USERNAME = os.environ.get(
+        "SMTP_USERNAME", os.environ.get("MAIL_USERNAME", "")
+    )
+    SMTP_PASSWORD = os.environ.get(
+        "SMTP_PASSWORD", os.environ.get("MAIL_PASSWORD", "")
+    )
+    MAIL_FROM = os.environ.get(
+        "MAIL_FROM", os.environ.get("MAIL_DEFAULT_SENDER", "")
+    )
+    MAIL_FROM_NAME = os.environ.get("MAIL_FROM_NAME", "AEC Compliance Portal")
+
+    # WhatsApp provider. WHATSAPP_API_BASE_URL / WHATSAPP_ACCESS_TOKEN are the
+    # primary keys; the legacy WHATSAPP_API_URL / WHATSAPP_API_TOKEN names are
+    # accepted as compatibility aliases.
+    WHATSAPP_PROVIDER = os.environ.get("WHATSAPP_PROVIDER", "generic")
+    WHATSAPP_API_BASE_URL = os.environ.get(
+        "WHATSAPP_API_BASE_URL", os.environ.get("WHATSAPP_API_URL", "")
+    )
+    WHATSAPP_ACCESS_TOKEN = os.environ.get(
+        "WHATSAPP_ACCESS_TOKEN", os.environ.get("WHATSAPP_API_TOKEN", "")
+    )
+    WHATSAPP_SENDER_ID = os.environ.get(
+        "WHATSAPP_SENDER_ID", os.environ.get("WHATSAPP_SENDER_PHONE", "")
+    )
+
     # Rate limiting (Flask-Limiter)
     RATELIMIT_ENABLED = _env_bool("RATELIMIT_ENABLED", True)
     RATELIMIT_DEFAULT = os.environ.get("RATELIMIT_DEFAULT", "200 per hour")

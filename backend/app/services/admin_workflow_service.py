@@ -27,6 +27,7 @@ from ..models import (
     Evidence,
     Finding,
     NotificationLog,
+    NotificationType,
     Permit,
     PermitStatus,
     Proponent,
@@ -54,6 +55,7 @@ from .admin_service import (
     _load,
     _resource_or_404,
 )
+from .notification_service import dispatch_event
 
 # --------------------------------------------------------------------------- #
 # Shared helpers
@@ -492,6 +494,16 @@ def finding_workflow(finding_id, payload: dict, user: User, request) -> Finding:
 
     _audit(f"admin.finding.{action}", user, "finding", str(finding.id), request)
     _commit()
+
+    if action == "verify":
+        dispatch_event(
+            event_type="finding_verified",
+            notification_type=NotificationType.FINDINGS_NOTICE,
+            proponent_id=finding.proponent_id,
+            finding_id=finding.id,
+            context={"finding_title": finding.finding_title},
+        )
+
     return finding
 
 
@@ -534,6 +546,19 @@ def review_evidence(evidence_id, payload: dict, user: User, request) -> Evidence
         request,
     )
     _commit()
+
+    dispatch_event(
+        event_type="evidence_reviewed",
+        notification_type=NotificationType.EVIDENCE_REVIEW,
+        proponent_id=evidence.proponent_id,
+        finding_id=evidence.finding_id,
+        context={
+            "finding_title": (
+                evidence.finding.finding_title if evidence.finding is not None else ""
+            ),
+            "status": target.value,
+        },
+    )
     return evidence
 
 
@@ -589,6 +614,29 @@ def booking_workflow(booking_id, payload: dict, user: User, request) -> Booking:
 
     _audit(f"admin.booking.{action}", user, "booking", str(booking.id), request)
     _commit()
+
+    if action in ("confirm", "reschedule"):
+        dispatch_event(
+            event_type=(
+                "booking_confirmed" if action == "confirm" else "booking_rescheduled"
+            ),
+            notification_type=NotificationType.BOOKING_CONFIRMATION,
+            proponent_id=booking.proponent_id,
+            email_recipient=booking.email,
+            whatsapp_recipient=booking.whatsapp_number,
+            context={
+                "name": booking.full_name,
+                "service": booking.service_needed.value,
+                "date": (
+                    booking.preferred_date.isoformat()
+                    if booking.preferred_date is not None
+                    else ""
+                ),
+                "time": booking.preferred_time or "",
+                "meeting_link": booking.meeting_link or "",
+            },
+        )
+
     return booking
 
 
@@ -663,6 +711,20 @@ def service_request_workflow(
         request,
     )
     _commit()
+
+    if action == "contact":
+        dispatch_event(
+            event_type="service_request_contacted",
+            notification_type=NotificationType.SERVICE_REQUEST,
+            proponent_id=service_request.proponent_id,
+            email_recipient=service_request.email,
+            whatsapp_recipient=service_request.whatsapp_number,
+            context={
+                "name": service_request.full_name,
+                "service": service_request.service_needed.value,
+            },
+        )
+
     return service_request
 
 
