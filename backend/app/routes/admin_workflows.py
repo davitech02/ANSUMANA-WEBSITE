@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import uuid
 
-from flask import Blueprint, Response, g, request, stream_with_context
+from flask import Blueprint, Response, current_app, g, request, stream_with_context
 
 from ..authorization import admin_required
 from ..schemas import (
@@ -24,7 +24,12 @@ from ..schemas import (
     PermitResponseSchema,
     ServiceRequestResponseSchema,
 )
-from ..services import admin_workflow_service, notification_service, reminder_service
+from ..services import (
+    admin_workflow_service,
+    health_service,
+    notification_service,
+    reminder_service,
+)
 from ..utils.errors import ApiError
 from ..utils.response import normalize_per_page, paginate, success
 
@@ -266,6 +271,42 @@ def run_reminders():
     return success(
         data=summary,
         message="Reminder run completed.",
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Operational diagnostics
+# --------------------------------------------------------------------------- #
+
+@admin_workflows_bp.get("/diagnostics")
+@admin_required
+def diagnostics():
+    """Return safe operational status for authenticated administrators.
+
+    Exposes only aggregate/non-secret state: application name, database
+    connectivity, configuration problems (as safe messages), notification
+    channel enablement flags, reminder-engine availability, and the current
+    Alembic migration head. Secrets, tokens, credentials, connection strings,
+    and raw environment variables are never included. The actor is always the
+    database-resolved ``g.current_user``; request-body actor ids are ignored.
+    """
+    problems = health_service.config_problems()
+    db_ok = health_service.database_available()
+    return success(
+        data={
+            "application": "aec-compliance-api",
+            "database": "available" if db_ok else "unavailable",
+            "configuration": {
+                "status": "ok" if not problems else "invalid",
+                "problems": problems,
+            },
+            "notifications": {
+                "email_enabled": bool(current_app.config.get("EMAIL_ENABLED")),
+                "whatsapp_enabled": bool(current_app.config.get("WHATSAPP_ENABLED")),
+            },
+            "reminders": {"available": True},
+            "migrations": {"head": health_service.migration_head()},
+        }
     )
 
 

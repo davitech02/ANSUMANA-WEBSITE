@@ -95,6 +95,11 @@ def app(tmp_path, monkeypatch):
     app.config["WHATSAPP_API_BASE_URL"] = "https://wa.test.invalid"
     os.makedirs(app.config["UPLOAD_DIR"], exist_ok=True)
 
+    # Pin the engine's default clock so the API-driven runs (which call
+    # ``run_reminders`` without an explicit ``now``) stay deterministic no
+    # matter what the real wall-clock date is when the suite runs.
+    monkeypatch.setattr(reminder_service, "utcnow", lambda: REF_NOW)
+
     RECORDS.clear()
     monkeypatch.setattr(_np.EmailProvider, "send", _fake_email_send)
     monkeypatch.setattr(_np.WhatsAppProvider, "send", _fake_whatsapp_send)

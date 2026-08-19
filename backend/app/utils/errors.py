@@ -14,7 +14,7 @@ optional extra ``data`` (e.g. field validation errors).
 
 from __future__ import annotations
 
-from flask import Flask, jsonify
+from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 
@@ -39,11 +39,33 @@ def _error_payload(code: str, message: str) -> dict:
     return {"status": "error", "code": code, "message": message}
 
 
+def _with_request_id(payload: dict) -> dict:
+    """Attach the current request correlation ID when one exists."""
+    try:
+        request_id = g.get("request_id")
+    except RuntimeError:
+        request_id = None
+    if request_id:
+        payload["request_id"] = request_id
+    return payload
+
+
+def _current_path() -> str | None:
+    try:
+        return request.path
+    except RuntimeError:
+        return None
+
+
 def register_error_handlers(app: Flask) -> None:
     """Attach JSON error handlers to the given Flask application."""
 
     @app.errorhandler(ApiError)
     def api_error(error: ApiError):
+        # NB: ApiError bodies must stay byte-identical across requests (some
+        # existing tests assert two error responses are exactly equal), so the
+        # request correlation id is intentionally NOT included here. The id is
+        # always echoed via the X-Request-ID response header instead.
         payload = _error_payload(error.code, error.message)
         if error.data is not None:
             payload["data"] = error.data
@@ -78,12 +100,25 @@ def register_error_handlers(app: Flask) -> None:
         )
 
     @app.errorhandler(500)
-    def internal_error(_error: Exception):
+    def internal_error(error: Exception):
+        # Log the real exception server-side (with correlation id and route)
+        # while returning only a safe, sanitized message to the client.
+        app.logger.error(
+            "Unhandled exception during request.",
+            exc_info=error,
+            extra={
+                "event": "unhandled_error",
+                "request_id": g.get("request_id"),
+                "route": _current_path(),
+            },
+        )
         return (
             jsonify(
-                _error_payload(
-                    "internal_error",
-                    "An unexpected error occurred.",
+                _with_request_id(
+                    _error_payload(
+                        "internal_error",
+                        "An unexpected error occurred.",
+                    )
                 )
             ),
             500,

@@ -10,6 +10,7 @@ from . import (
     auth_service,
     audit_service,
     client_service,
+    health_service,
     notification_service,
     public_service,
     reminder_service,

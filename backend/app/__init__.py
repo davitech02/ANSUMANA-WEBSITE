@@ -10,6 +10,7 @@ from flask_cors import CORS
 from .cli import register_commands
 from .config import ProductionConfig, get_config
 from .extensions import db, jwt, limiter, ma, mail, migrate
+from .observability import init_observability
 from .routes import register_blueprints
 from .utils.errors import register_error_handlers
 from . import models  # noqa: F401  (registers all models with SQLAlchemy)
@@ -46,6 +47,9 @@ def create_app(config_override: str | None = None) -> Flask:
 
     # Standardized JSON error responses for all HTTP errors
     register_error_handlers(app)
+
+    # Request correlation (X-Request-ID) + structured per-request logging
+    init_observability(app)
 
     # Register API blueprints
     register_blueprints(app)

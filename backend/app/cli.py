@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import getpass
 import json
+import logging
 import os
 import secrets
 from datetime import datetime, timezone
@@ -506,11 +507,22 @@ def run_reminders_command(dry_run) -> None:
 
     Suitable for invocation by an external scheduler (e.g. a cron/Windows
     Task Scheduler line ``flask run-reminders``). Prints the aggregated run
-    summary as JSON.
+    summary as JSON and exits 0 on success (including runs where individual
+    provider deliveries failed, per the reminder-service isolation contract).
+    An operational failure (e.g. the database being unavailable) exits
+    non-zero. No secrets, recipients, or raw provider output are ever printed.
     """
     from .services import reminder_service
 
-    summary = reminder_service.run_reminders(dry_run=dry_run)
+    try:
+        summary = reminder_service.run_reminders(dry_run=dry_run)
+    except Exception:
+        logging.getLogger("aec.cli").exception(
+            "Reminder run failed.", extra={"event": "reminder_run_failed"}
+        )
+        raise click.ClickException(
+            "Reminder run failed. Check the application logs for details."
+        )
     click.echo(json.dumps(summary, indent=2))
 
 
