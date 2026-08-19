@@ -9,7 +9,6 @@ import {
   LogOut,
   LayoutDashboard,
   Building2,
-  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 
@@ -18,8 +17,6 @@ interface ProfileMenuProps {
   variant?: 'dark' | 'light';
   /** Optional: opens an account details modal (portal header usage). */
   onViewAccount?: () => void;
-  /** Optional: shows the demo view-role switcher (portal header usage). */
-  showRoleSwitcher?: boolean;
   /** Optional: custom logout handler (e.g. navigate to /login). Defaults to auth logout. */
   onLogout?: () => void;
 }
@@ -27,11 +24,10 @@ interface ProfileMenuProps {
 export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   variant = 'dark',
   onViewAccount,
-  showRoleSwitcher = false,
   onLogout,
 }) => {
   const [open, setOpen] = useState(false);
-  const { user, proponent, logout, switchRole } = useAuth();
+  const { user, proponent, logout } = useAuth();
   const navigate = useNavigate();
 
   const isAdmin = user?.role === 'admin';
@@ -40,24 +36,14 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const settingsPath = isAdmin ? '/admin/settings' : '/portal/company';
   const supportPath = isAdmin ? '/admin/support' : '/portal/support';
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setOpen(false);
     if (onLogout) {
       onLogout();
     } else {
-      logout();
+      await logout();
+      navigate('/login');
     }
-  };
-
-  const switchToRole = (role: 'admin' | 'client') => {
-    if (role === 'admin') {
-      switchRole('admin');
-      navigate('/admin');
-    } else {
-      switchRole('client', 'compliance@liberiagold.lr');
-      navigate('/portal');
-    }
-    setOpen(false);
   };
 
   return (
@@ -205,37 +191,6 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
               <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
             </Link>
           </div>
-
-          {/* Demo Role Switcher (portal only) */}
-          {showRoleSwitcher && (
-            <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 space-y-1">
-              <p className="text-[9px] font-mono font-bold uppercase text-gray-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#D4AF37]" /> Switch View Role
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  onClick={() => switchToRole('admin')}
-                  className={`py-1 px-2 rounded-lg text-[10px] font-bold ${
-                    isAdmin
-                      ? 'bg-[#0A2E24] text-[#D4AF37]'
-                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  Admin
-                </button>
-                <button
-                  onClick={() => switchToRole('client')}
-                  className={`py-1 px-2 rounded-lg text-[10px] font-bold ${
-                    !isAdmin
-                      ? 'bg-[#0A2E24] text-[#D4AF37]'
-                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  Client
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Sign Out */}
           <div className="p-1">

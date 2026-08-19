@@ -1,27 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { History, Mail, MessageSquare, Bell, ShieldCheck, CheckCircle2 } from 'lucide-react';
-import { getStorageData } from '../../lib/storage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { History, Mail, MessageSquare, Bell, ShieldCheck, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
+import { portalApi } from '../../lib/api';
 import { useAuth } from '../../lib/AuthContext';
+import type { NotificationLog } from '../../types';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
 
 export const ClientReminders: React.FC = () => {
-  const [data, setData] = useState(() => getStorageData());
   const { user, proponent } = useAuth();
+  const [logs, setLogs] = useState<NotificationLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+  const loadLogs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await portalApi.listClientReminders();
+      setLogs(res.items);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Filter logs for this proponent (exact match to avoid cross-proponent data leaks)
+  useEffect(() => {
+    loadLogs();
+  }, [loadLogs]);
+
   const clientEmail = (proponent?.email || user?.email || '').toLowerCase();
-  const clientWhatsApp = (proponent?.whatsapp_number || '').replace(/[^0-9+]/g, '').toLowerCase();
-  const myLogs = data.logs.filter((l) => {
-    const rec = l.recipient.toLowerCase();
-    if (clientEmail && rec === clientEmail) return true;
-    if (clientWhatsApp && rec.replace(/[^0-9+]/g, '').toLowerCase() === clientWhatsApp) return true;
-    return false;
-  });
 
   return (
     <div className="space-y-6 font-sans">
@@ -42,7 +52,7 @@ export const ClientReminders: React.FC = () => {
           </div>
           <div>
             <p className="text-[11px] text-gray-500 font-mono uppercase">Total Dispatched</p>
-            <p className="text-xl font-bold text-[#0A2E24]">{myLogs.length}</p>
+            <p className="text-xl font-bold text-[#0A2E24]">{logs.length}</p>
           </div>
         </div>
 
@@ -76,49 +86,68 @@ export const ClientReminders: React.FC = () => {
           <span className="text-[11px] text-gray-500 font-mono">Real-Time Dispatch Feed</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#0A2E24] text-[#D4AF37] text-[11px] font-mono uppercase">
-                <th className="p-3">Timestamp</th>
-                <th className="p-3">Channel</th>
-                <th className="p-3">Alert Type</th>
-                <th className="p-3">Subject / Detail</th>
-                <th className="p-3">Delivery Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-xs text-gray-700 font-mono">
-              {myLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-500 italic">
-                    No reminder logs found for {clientEmail}. New statutory reminders will appear here automatically when upcoming audit reports approach their deadline.
-                  </td>
+        {loading ? (
+          <div className="p-12 text-center space-y-3">
+            <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37] mx-auto" />
+            <p className="text-sm font-bold text-[#0A2E24]">Loading reminder logs...</p>
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center space-y-3">
+            <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
+            <p className="text-sm font-bold text-rose-800">Unable to load reminder logs</p>
+            <p className="text-xs text-rose-600">{error}</p>
+            <button
+              onClick={loadLogs}
+              className="px-4 py-2 bg-[#0A2E24] text-[#D4AF37] font-bold text-xs rounded-xl hover:bg-[#1A4A3A] transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#0A2E24] text-[#D4AF37] text-[11px] font-mono uppercase">
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Channel</th>
+                  <th className="p-3">Alert Type</th>
+                  <th className="p-3">Subject / Detail</th>
+                  <th className="p-3">Delivery Status</th>
                 </tr>
-              ) : (
-                myLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-3 text-[11px] text-gray-500">
-                      {new Date(log.created_date).toLocaleString()}
-                    </td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded bg-gray-100 text-[#0A2E24] font-bold text-[10px] inline-flex items-center gap-1">
-                        {log.channel === 'WhatsApp' ? <MessageSquare className="w-3 h-3 text-emerald-600" /> : <Mail className="w-3 h-3 text-blue-600" />}
-                        {log.channel}
-                      </span>
-                    </td>
-                    <td className="p-3 text-[#0A2E24] font-bold">{log.notification_type}</td>
-                    <td className="p-3 text-gray-600">{log.subject}</td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1 w-fit">
-                        <CheckCircle2 className="w-3 h-3" /> {log.status}
-                      </span>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs text-gray-700 font-mono">
+                {logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-gray-500 italic">
+                      No reminder logs found for {clientEmail}. New statutory reminders will appear here automatically when upcoming audit reports approach their deadline.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  logs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-3 text-[11px] text-gray-500">
+                        {new Date(log.created_at).toLocaleString()}
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-gray-100 text-[#0A2E24] font-bold text-[10px] inline-flex items-center gap-1">
+                          {log.channel === 'WhatsApp' ? <MessageSquare className="w-3 h-3 text-emerald-600" /> : <Mail className="w-3 h-3 text-blue-600" />}
+                          {log.channel}
+                        </span>
+                      </td>
+                      <td className="p-3 text-[#0A2E24] font-bold">{log.notification_type}</td>
+                      <td className="p-3 text-gray-600">{log.subject}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-1 w-fit">
+                          <CheckCircle2 className="w-3 h-3" /> {log.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

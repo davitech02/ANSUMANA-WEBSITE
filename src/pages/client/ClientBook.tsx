@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, CheckCircle2, Video } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
-import { getStorageData, saveStorageData } from '../../lib/storage';
-import { Booking, BookingService } from '../../types';
-import { sendEmailNotification, AEC_ADMIN_EMAIL } from '../../lib/notifications';
+import { publicApi } from '../../lib/api';
+import type { BookingService } from '../../types';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
+
+type SubmittedBooking = Awaited<ReturnType<typeof publicApi.submitPublicBooking>>;
 
 export const ClientBook: React.FC = () => {
-  const { user } = useAuth();
-  const [data] = useState(() => getStorageData());
-
-  const proponent = data.proponents.find(
-    (p) => p.email.toLowerCase() === (user?.email || '').toLowerCase()
-  ) || data.proponents[0];
+  const { user, proponent } = useAuth();
 
   const [form, setForm] = useState({
     service_needed: 'Environmental audit planning session' as BookingService,
@@ -20,41 +20,33 @@ export const ClientBook: React.FC = () => {
     message: '',
   });
 
-  const [submitted, setSubmitted] = useState<Booking | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState<SubmittedBooking | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentData = getStorageData();
-
-    const newBooking: Booking = {
-      id: 'book-' + Math.random().toString(36).substring(2, 9),
-      full_name: user?.name || proponent?.contact_person || 'Proponent Contact',
-      company_name: proponent?.company_name || 'Proponent Company',
-      email: user?.email || proponent?.email || 'client@company.lr',
-      phone: proponent?.phone || '+231 088 000 000',
-      whatsapp_number: proponent?.whatsapp_number || '+231 077 000 000',
-      service_needed: form.service_needed,
-      preferred_date: form.preferred_date,
-      preferred_time: form.preferred_time,
-      project_location: 'AEC Paynesville Office / Google Meet',
-      message: form.message,
-      booking_status: 'Confirmed',
-      meeting_link: 'https://meet.google.com/aec-client-session-' + Math.floor(100 + Math.random() * 900),
-      created_date: new Date().toISOString(),
-    };
-
-    currentData.bookings.unshift(newBooking);
-    saveStorageData(currentData);
-
-    // Notify
-    sendEmailNotification({
-      to: AEC_ADMIN_EMAIL,
-      subject: `New Portal Booking: ${form.service_needed} - ${proponent?.company_name}`,
-      body: `Client ${proponent?.company_name} booked ${form.service_needed} on ${form.preferred_date} @ ${form.preferred_time}.`,
-      notificationType: 'Booking confirmation',
-    });
-
-    setSubmitted(newBooking);
+    setError('');
+    setSaving(true);
+    try {
+      const booking = await publicApi.submitPublicBooking({
+        full_name: user?.full_name || proponent?.contact_person || '',
+        company_name: proponent?.company_name || '',
+        email: user?.email || proponent?.email || '',
+        phone: proponent?.phone || '',
+        whatsapp_number: proponent?.whatsapp_number || undefined,
+        service_needed: form.service_needed,
+        preferred_date: form.preferred_date,
+        preferred_time: form.preferred_time,
+        project_location: proponent?.project_location || '',
+        message: form.message,
+      });
+      setSubmitted(booking);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -74,20 +66,30 @@ export const ClientBook: React.FC = () => {
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h3 className="font-heading font-bold text-xl text-[#0A2E24]">Session Reserved!</h3>
-            <p className="text-xs text-gray-600">
-              Confirmed for <strong>{submitted.preferred_date} @ {submitted.preferred_time}</strong>
-            </p>
-            <div className="pt-2">
-              <a
-                href={submitted.meeting_link}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl"
-              >
-                <Video className="w-4 h-4" /> Open Google Meet Link
-              </a>
+            <h3 className="font-heading font-bold text-xl text-[#0A2E24]">Booking Request Submitted!</h3>
+            <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 text-left max-w-lg mx-auto space-y-3">
+              <div className="flex justify-between border-b border-gray-200 pb-2 text-xs">
+                <span className="text-gray-500 font-mono">Service:</span>
+                <span className="font-bold text-[#0A2E24]">{submitted.service_needed}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-2 text-xs">
+                <span className="text-gray-500 font-mono">Preferred Date & Time:</span>
+                <span className="font-bold text-[#0A2E24]">{submitted.preferred_date} @ {submitted.preferred_time}</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-2 text-xs">
+                <span className="text-gray-500 font-mono">Email:</span>
+                <span className="font-bold text-[#0A2E24]">{submitted.email}</span>
+              </div>
+              <div className="flex justify-between pb-2 text-xs">
+                <span className="text-gray-500 font-mono">Status:</span>
+                <span className="font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                  Pending
+                </span>
+              </div>
             </div>
+            <p className="text-xs text-gray-600 max-w-md mx-auto">
+              Your booking has been received and is marked as <strong className="text-[#0A2E24]">Pending</strong> confirmation. AEC will review your request and confirm your consultation by email to <strong className="text-[#0A2E24]">{submitted.email}</strong>.
+            </p>
             <div className="pt-2">
               <button
                 onClick={() => setSubmitted(null)}
@@ -99,6 +101,12 @@ export const ClientBook: React.FC = () => {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" /> {error}
+              </div>
+            )}
+
             <div>
               <label className="block font-bold text-gray-700 mb-1">Consultation Service *</label>
               <select
@@ -156,9 +164,10 @@ export const ClientBook: React.FC = () => {
 
             <button
               type="submit"
-              className="px-6 py-3 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+              disabled={saving}
+              className="px-6 py-3 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Calendar className="w-4 h-4" /> Confirm Consultation Booking
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calendar className="w-4 h-4" />} {saving ? 'Submitting Booking...' : 'Confirm Consultation Booking'}
             </button>
           </form>
         )}

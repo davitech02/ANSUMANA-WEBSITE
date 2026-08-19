@@ -1,11 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, Search, Plus, Edit, Trash2, X, Check, Filter } from 'lucide-react';
-import { Proponent, ProjectType } from '../../types';
-import { getStorageData, saveStorageData } from '../../lib/storage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Building2, Search, Plus, Edit, Trash2, X, Loader2, AlertCircle } from 'lucide-react';
+import type { Proponent, ProjectType, Pagination } from '../../types';
+import { adminApi } from '../../lib/api';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
+
+const PER_PAGE = 25;
 
 export const AdminProponents: React.FC = () => {
-  const [data, setData] = useState(() => getStorageData());
+  const [items, setItems] = useState<Proponent[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Proponent | null>(null);
 
@@ -23,11 +35,34 @@ export const AdminProponents: React.FC = () => {
     status: 'Active',
   });
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminApi.listProponents({ page, per_page: PER_PAGE, q: searchTerm });
+      setItems(res.items);
+      setPagination(res.pagination);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [page, searchTerm]);
+
   useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
-  }, []);
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(null), 3000);
+    return () => clearTimeout(t);
+  }, [success]);
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setPage(1);
+  };
 
   const handleOpenAdd = () => {
     setEditingItem(null);
@@ -53,44 +88,54 @@ export const AdminProponents: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this proponent company?')) {
-      const currentData = getStorageData();
-      currentData.proponents = currentData.proponents.filter((p) => p.id !== id);
-      saveStorageData(currentData);
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this proponent company?')) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await adminApi.deleteProponent(id);
+      setSuccess('Proponent deleted successfully.');
+      load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentData = getStorageData();
-
-    if (editingItem) {
-      currentData.proponents = currentData.proponents.map((p) =>
-        p.id === editingItem.id ? { ...(form as Proponent), updated_date: new Date().toISOString() } : p
-      );
-    } else {
-      const newProp: Proponent = {
-        ...(form as Proponent),
-        id: 'prop-' + Math.random().toString(36).substring(2, 9),
-        created_date: new Date().toISOString(),
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        company_name: form.company_name ?? '',
+        contact_person: form.contact_person ?? '',
+        email: form.email ?? '',
+        phone: form.phone,
+        whatsapp_number: form.whatsapp_number,
+        project_type: form.project_type,
+        county: form.county,
+        district: form.district,
+        project_location: form.project_location,
+        project_description: form.project_description,
+        status: form.status ?? 'Active',
       };
-      currentData.proponents.unshift(newProp);
+      if (editingItem) {
+        await adminApi.updateProponent(editingItem.id, payload);
+        setSuccess('Proponent updated successfully.');
+      } else {
+        await adminApi.createProponent(payload);
+        setSuccess('Proponent created successfully.');
+      }
+      setModalOpen(false);
+      load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
     }
-
-    saveStorageData(currentData);
-    setModalOpen(false);
   };
-
-  const filteredProponents = data.proponents.filter((p) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      p.company_name.toLowerCase().includes(term) ||
-      p.contact_person.toLowerCase().includes(term) ||
-      p.email.toLowerCase().includes(term) ||
-      p.project_type.toLowerCase().includes(term)
-    );
-  });
 
   return (
     <div className="space-y-6 font-sans">
@@ -110,13 +155,25 @@ export const AdminProponents: React.FC = () => {
         </button>
       </div>
 
+      {success && (
+        <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {success}
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 p-3 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
+
       {/* Filter / Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
         <Search className="w-4 h-4 text-gray-400" />
         <input
           type="text"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search proponents by company name, contact, email or sector..."
           className="w-full text-xs focus:outline-none"
         />
@@ -134,18 +191,27 @@ export const AdminProponents: React.FC = () => {
                 <th className="p-3">District / Province</th>
                 <th className="p-3">Phone & Email</th>
                 <th className="p-3">Status</th>
+                <th className="p-3">Created</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
-              {filteredProponents.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-gray-500 italic">
-                    No matching proponents found.
+                  <td colSpan={8} className="p-8 text-center">
+                    <div className="flex items-center justify-center gap-2 text-gray-400">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading proponents…
+                    </div>
+                  </td>
+                </tr>
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-6 text-center text-gray-500 italic">
+                    No proponents found.
                   </td>
                 </tr>
               ) : (
-                filteredProponents.map((prop) => (
+                items.map((prop) => (
                   <tr key={prop.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-bold text-[#0A2E24]">{prop.company_name}</td>
                     <td className="p-3">{prop.contact_person}</td>
@@ -164,17 +230,22 @@ export const AdminProponents: React.FC = () => {
                         {prop.status}
                       </span>
                     </td>
+                    <td className="p-3 text-[10px] text-gray-500">
+                      {new Date(prop.created_at).toLocaleString()}
+                    </td>
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => handleOpenEdit(prop)}
-                        className="p-1.5 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] rounded-lg transition-colors"
+                        disabled={saving}
+                        className="p-1.5 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] rounded-lg transition-colors disabled:opacity-50"
                         title="Edit Proponent"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(prop.id)}
-                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                        disabled={saving}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50"
                         title="Delete Proponent"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -187,6 +258,30 @@ export const AdminProponents: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {pagination && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500">
+            Page {pagination.page} of {pagination.total_pages} ({pagination.total} total)
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pagination.page <= 1 || loading}
+              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-lg disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={pagination.page >= pagination.total_pages || loading}
+              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-lg disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (
@@ -202,6 +297,12 @@ export const AdminProponents: React.FC = () => {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4 text-xs">
+              {error && (
+                <div className="bg-red-50 p-3 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Company Name *</label>
                 <input
@@ -339,15 +440,17 @@ export const AdminProponents: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg"
+                  disabled={saving}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-lg"
+                  disabled={saving}
+                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-lg disabled:opacity-50"
                 >
-                  Save Proponent
+                  {saving ? 'Saving…' : 'Save Proponent'}
                 </button>
               </div>
             </form>

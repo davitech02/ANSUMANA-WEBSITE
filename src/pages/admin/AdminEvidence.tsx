@@ -1,45 +1,101 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, CheckCircle2, XCircle, FileText, Download, MessageSquare } from 'lucide-react';
-import { EvidenceUpload, ReviewStatus } from '../../types';
-import { getStorageData, saveStorageData } from '../../lib/storage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Upload, CheckCircle2, Download, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { adminApi, workflowsApi, saveDownload } from '../../lib/api';
+import type { Evidence, Pagination } from '../../types';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
+
+const PER_PAGE = 25;
 
 export const AdminEvidence: React.FC = () => {
-  const [data, setData] = useState(() => getStorageData());
-  const [selectedItem, setSelectedItem] = useState<EvidenceUpload | null>(null);
+  const [evidence, setEvidence] = useState<Evidence[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [page, setPage] = useState(1);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Evidence | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminApi.listEvidence({
+        page,
+        per_page: PER_PAGE,
+        review_status: filterStatus !== 'all' ? filterStatus : undefined,
+      });
+      setEvidence(res.items);
+      setPagination(res.pagination);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filterStatus]);
 
   useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
-  }, []);
+    load();
+  }, [load]);
 
-  const handleUpdateStatus = (id: string, status: ReviewStatus) => {
-    const currentData = getStorageData();
-    currentData.evidence = currentData.evidence.map((e) => {
-      if (e.id === id) {
-        return {
-          ...e,
-          review_status: status,
-          review_notes: reviewNotes || e.review_notes,
-          reviewed_date: new Date().toISOString(),
-        };
-      }
-      return e;
-    });
-
-    // Also if approved, mark associated finding as Verified
-    const targetEvidence = currentData.evidence.find((e) => e.id === id);
-    if (targetEvidence && status === 'Approved' && targetEvidence.finding_id) {
-      currentData.findings = currentData.findings.map((f) =>
-        f.id === targetEvidence.finding_id ? { ...f, action_status: 'Verified' } : f
-      );
+  const handleReview = async (status: 'Approved' | 'Rejected' | 'More action needed') => {
+    if (!selectedItem) return;
+    setSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await workflowsApi.reviewEvidence(selectedItem.id, {
+        status,
+        review_notes: reviewNotes || null,
+        admin_comment: null,
+      });
+      setSuccess(`Evidence ${status}.`);
+      setSelectedItem(null);
+      setReviewNotes('');
+      await load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSubmitting(false);
     }
-
-    saveStorageData(currentData);
-    setSelectedItem(null);
-    setReviewNotes('');
   };
+
+  const handleDownload = async (id: string) => {
+    setDownloadingId(id);
+    setError(null);
+    try {
+      await saveDownload(`/admin/evidence/${id}/file`);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this evidence record?')) return;
+    setDeletingId(id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await adminApi.deleteEvidence(id);
+      setSuccess('Evidence record deleted.');
+      await load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const totalPages = pagination?.total_pages ?? 1;
 
   return (
     <div className="space-y-6 font-sans">
@@ -51,6 +107,37 @@ export const AdminEvidence: React.FC = () => {
           Review documents, photos, laboratory test certificates, and site inspection evidence submitted by proponents
         </p>
       </div>
+
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2 self-end sm:self-auto text-xs">
+          <span className="font-mono text-[10px] text-gray-500 font-bold uppercase">Review Status Filter:</span>
+          <select
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setPage(1);
+            }}
+            className="p-1.5 border border-gray-300 rounded-lg bg-white font-mono text-xs focus:outline-none focus:border-[#D4AF37]"
+          >
+            <option value="all">All Statuses</option>
+            <option value="Pending review">Pending review</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="More action needed">More action needed</option>
+          </select>
+        </div>
+      </div>
+
+      {success && (
+        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {success}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -66,30 +153,49 @@ export const AdminEvidence: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
-              {data.evidence.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center">
+                    <span className="inline-flex items-center gap-2 text-gray-500 italic">
+                      <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin" /> Loading evidence…
+                    </span>
+                  </td>
+                </tr>
+              ) : evidence.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-6 text-center text-gray-500 italic">
                     No evidence records submitted yet.
                   </td>
                 </tr>
               ) : (
-                data.evidence.map((ev) => (
+                evidence.map((ev) => (
                   <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-bold text-[#0A2E24]">{ev.proponent_name}</td>
                     <td className="p-3 space-y-0.5">
                       <p className="font-bold text-gray-900">{ev.evidence_title}</p>
                       <p className="text-[10px] text-gray-500 max-w-xs truncate">{ev.description}</p>
+                      {ev.review_notes && (
+                        <p className="text-[10px] text-amber-700 italic">Review notes: {ev.review_notes}</p>
+                      )}
                     </td>
-                    <td className="p-3 font-mono text-[11px]">{(ev.uploaded_date || ev.created_date || '').split('T')[0]}</td>
+                    <td className="p-3 font-mono text-[11px]">{ev.created_at ? ev.created_at.split('T')[0] : ''}</td>
                     <td className="p-3">
-                      <a
-                        href={ev.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[#0A2E24] hover:text-[#D4AF37] font-bold text-[11px] inline-flex items-center gap-1"
-                      >
-                        <Download className="w-3.5 h-3.5 text-[#D4AF37]" /> Open File
-                      </a>
+                      {ev.has_file ? (
+                        <button
+                          onClick={() => handleDownload(ev.id)}
+                          disabled={downloadingId !== null}
+                          className="text-[#0A2E24] hover:text-[#D4AF37] font-bold text-[11px] inline-flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {downloadingId === ev.id ? (
+                            <Loader2 className="w-3.5 h-3.5 text-[#D4AF37] animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          )}
+                          {downloadingId === ev.id ? 'Downloading…' : 'Download File'}
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-[10px]">No File</span>
+                      )}
                     </td>
                     <td className="p-3">
                       <span
@@ -98,21 +204,35 @@ export const AdminEvidence: React.FC = () => {
                             ? 'bg-emerald-100 text-emerald-800'
                             : ev.review_status === 'Rejected'
                             ? 'bg-red-100 text-red-800'
+                            : ev.review_status === 'More action needed'
+                            ? 'bg-blue-100 text-blue-800'
                             : 'bg-amber-100 text-amber-800'
                         }`}
                       >
                         {ev.review_status}
                       </span>
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => {
                           setSelectedItem(ev);
                           setReviewNotes(ev.review_notes || '');
+                          setError(null);
                         }}
                         className="px-3 py-1 bg-[#0A2E24] text-[#D4AF37] font-bold rounded text-xs hover:bg-[#1A4A3A]"
                       >
                         Review
+                      </button>
+                      <button
+                        onClick={() => handleDelete(ev.id)}
+                        disabled={deletingId !== null}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {deletingId === ev.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -120,6 +240,26 @@ export const AdminEvidence: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 text-xs">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#0A2E24] font-bold rounded-lg disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="font-mono text-[11px] text-gray-500 font-bold">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#0A2E24] font-bold rounded-lg disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -137,9 +277,17 @@ export const AdminEvidence: React.FC = () => {
               <p><strong className="text-gray-500">Details:</strong> {selectedItem.description}</p>
               <p>
                 <strong className="text-gray-500">File:</strong>{' '}
-                <a href={selectedItem.file_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">
-                  View Uploaded Attachment
-                </a>
+                {selectedItem.has_file ? (
+                  <button
+                    onClick={() => handleDownload(selectedItem.id)}
+                    disabled={downloadingId !== null}
+                    className="text-blue-600 underline disabled:opacity-50"
+                  >
+                    {downloadingId === selectedItem.id ? 'Downloading…' : 'Download Attachment'}
+                  </button>
+                ) : (
+                  <span className="text-gray-400">No file uploaded</span>
+                )}
               </p>
             </div>
 
@@ -157,21 +305,31 @@ export const AdminEvidence: React.FC = () => {
             <div className="flex gap-2 justify-end pt-2">
               <button
                 onClick={() => setSelectedItem(null)}
-                className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg"
+                disabled={submitting}
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-lg disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleUpdateStatus(selectedItem.id, 'Rejected')}
-                className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700"
+                onClick={() => handleReview('Rejected')}
+                disabled={submitting}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 Reject
               </button>
               <button
-                onClick={() => handleUpdateStatus(selectedItem.id, 'Approved')}
-                className="px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800"
+                onClick={() => handleReview('More action needed')}
+                disabled={submitting}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                Approve & Mark Verified
+                More Action Needed
+              </button>
+              <button
+                onClick={() => handleReview('Approved')}
+                disabled={submitting}
+                className="px-3 py-1.5 bg-emerald-700 text-white text-xs font-bold rounded-lg hover:bg-emerald-800 disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : 'Approve & Mark Verified'}
               </button>
             </div>
           </div>

@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { HelpCircle, MessageSquare, Send, CheckCircle2, ShieldCheck, FileText, Phone, Mail, BookOpen } from 'lucide-react';
+import { HelpCircle, MessageSquare, Send, CheckCircle2, ShieldCheck, FileText, Phone, Mail, BookOpen, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
-import { getStorageData, saveStorageData } from '../../lib/storage';
-import { sendEmailNotification, sendWhatsAppNotification, AEC_ADMIN_EMAIL } from '../../lib/notifications';
-import { ServiceRequest } from '../../types';
+import { publicApi } from '../../lib/api';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
 
 export const ClientSupport: React.FC = () => {
   const { user, proponent } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const [ticket, setTicket] = useState({
@@ -15,52 +19,30 @@ export const ClientSupport: React.FC = () => {
     message: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticket.subject.trim() || !ticket.message.trim()) return;
 
-    // Persist the support ticket as a service request so it survives refresh
-    const data = getStorageData();
-    const newRequest: ServiceRequest = {
-      id: 'req-' + Math.random().toString(36).substring(2, 9),
-      full_name: user?.full_name || 'Portal User',
-      company_name: proponent?.company_name || 'N/A',
-      email: user?.email || '',
-      phone: proponent?.phone || '',
-      whatsapp_number: proponent?.whatsapp_number || '',
-      service_needed: 'Compliance advisory',
-      project_location: proponent?.project_location || 'Liberia',
-      message: `[SUPPORT TICKET: ${ticket.category}] ${ticket.subject}\n\n${ticket.message}`,
-      status: 'New',
-      created_date: new Date().toISOString(),
-    };
-    data.requests.unshift(newRequest);
-    saveStorageData(data);
-
-    // Dispatch notifications to AEC Admin & Client
-    sendEmailNotification({
-      to: user?.email || 'compliance@liberiagold.lr',
-      subject: `[AEC Support Ticket] ${ticket.subject}`,
-      body: `Your support inquiry regarding "${ticket.category}" has been received by Ansumana Environmental Consultancy Inc. An EPA compliance specialist will respond within 24 hours.`,
-      notificationType: 'Support Request',
-    });
-
-    sendEmailNotification({
-      to: AEC_ADMIN_EMAIL,
-      subject: `[AEC Support Ticket] ${ticket.subject} - ${proponent?.company_name || user?.full_name || 'Portal User'}`,
-      body: `A new support ticket has been submitted via the client portal.\n\nCompany: ${proponent?.company_name || 'N/A'}\nContact: ${user?.full_name || ''} (${user?.email || ''})\nCategory: ${ticket.category}\nSubject: ${ticket.subject}\n\nMessage:\n${ticket.message}`,
-      notificationType: 'Support Request',
-      proponentId: proponent?.id,
-    });
-
-    sendWhatsAppNotification({
-      to: proponent?.whatsapp_number || '+231 077 530 1445',
-      subject: `Support Ticket: ${ticket.subject}`,
-      body: `AEC Support Ticket Opened: "${ticket.subject}". An EPA consultant will reach out via WhatsApp/Phone shortly.`,
-      notificationType: 'Support Request',
-    });
-
-    setSubmitted(true);
+    setError('');
+    setSaving(true);
+    try {
+      const message = `[SUPPORT TICKET: ${ticket.category}] ${ticket.subject}\n\n${ticket.message}`;
+      await publicApi.submitPublicServiceRequest({
+        full_name: user?.full_name || proponent?.contact_person || '',
+        company_name: proponent?.company_name || undefined,
+        email: user?.email || '',
+        phone: proponent?.phone || undefined,
+        whatsapp_number: proponent?.whatsapp_number || undefined,
+        service_needed: 'Compliance advisory',
+        project_location: proponent?.project_location || undefined,
+        message,
+      });
+      setSubmitted(true);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -147,6 +129,12 @@ export const ClientSupport: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              {error && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> {error}
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Inquiry Category *</label>
                 <select
@@ -189,9 +177,10 @@ export const ClientSupport: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                disabled={saving}
+                className="w-full py-3 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Send className="w-4 h-4" /> Send Ticket to AEC Team
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} {saving ? 'Sending Ticket...' : 'Send Ticket to AEC Team'}
               </button>
             </form>
           )}

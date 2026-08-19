@@ -1,19 +1,72 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Plus, Edit, Trash2, X, Search, ShieldCheck } from 'lucide-react';
-import { ComplianceFinding, ComplianceStatus, RiskLevel, ActionStatus } from '../../types';
-import { getStorageData, saveStorageData } from '../../lib/storage';
+import React, { useState, useEffect, useCallback } from 'react';
+import { AlertTriangle, Plus, Edit, Trash2, X, Search, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { adminApi, workflowsApi } from '../../lib/api';
+import type { Finding, Proponent, Pagination } from '../../types';
 import { ComplianceStatusBadge, RiskLevelBadge, ActionStatusBadge } from '../../components/common/StatusBadges';
-import { DateRangeFilter, DateRange } from '../../components/common/DateRangeFilter';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
+
+type WorkflowAction = 'start' | 'submit_for_review' | 'verify' | 'reopen' | 'mark_overdue';
+
+const PER_PAGE = 25;
+
+const WORKFLOW_LABELS: Record<WorkflowAction, string> = {
+  start: 'Start',
+  submit_for_review: 'Submit Review',
+  verify: 'Verify',
+  reopen: 'Reopen',
+  mark_overdue: 'Mark Overdue',
+};
+
+function workflowButtons(f: Finding): WorkflowAction[] {
+  switch (f.action_status) {
+    case 'Open':
+      return ['start', 'mark_overdue'];
+    case 'Pending':
+    case 'In progress':
+      return ['submit_for_review', 'mark_overdue'];
+    case 'Submitted for review':
+      return ['verify'];
+    case 'Verified':
+      return ['reopen'];
+    case 'Overdue':
+      return ['reopen', 'start'];
+    default:
+      return [];
+  }
+}
+
+interface FindingForm {
+  proponent_id: string;
+  finding_title: string;
+  inspection_area: string;
+  compliance_status: string;
+  risk_level: string;
+  corrective_action: string;
+  action_deadline: string;
+  responsible_party: string;
+  action_status: string;
+}
 
 export const AdminFindings: React.FC = () => {
-  const [data, setData] = useState(() => getStorageData());
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [proponents, setProponents] = useState<Proponent[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRisk, setFilterRisk] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<ComplianceFinding | null>(null);
+  const [editingItem, setEditingItem] = useState<Finding | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [workflowBusy, setWorkflowBusy] = useState<{ id: string; action: WorkflowAction } | null>(null);
 
-  const [form, setForm] = useState<Partial<ComplianceFinding>>({
+  const [form, setForm] = useState<FindingForm>({
     proponent_id: '',
     finding_title: '',
     inspection_area: 'Tailings Management & Effluent',
@@ -25,15 +78,47 @@ export const AdminFindings: React.FC = () => {
     action_status: 'Open',
   });
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminApi.listFindings({
+        page,
+        per_page: PER_PAGE,
+        q: searchTerm || undefined,
+        risk_level: filterRisk !== 'all' ? filterRisk : undefined,
+      });
+      setFindings(res.items);
+      setPagination(res.pagination);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [page, searchTerm, filterRisk]);
+
   useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    adminApi
+      .listProponents({ page: 1, per_page: 100 })
+      .then((res) => {
+        if (active) setProponents(res.items);
+      })
+      .catch(() => {
+        /* dropdown best-effort */
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const handleOpenAdd = () => {
     setEditingItem(null);
-    const defaultProp = data.proponents[0]?.id || '';
+    const defaultProp = proponents[0]?.id || '';
     const d = new Date();
     d.setDate(d.getDate() + 15);
     const dateStr = d.toISOString().split('T')[0];
@@ -49,67 +134,94 @@ export const AdminFindings: React.FC = () => {
       responsible_party: 'Environmental Manager',
       action_status: 'Open',
     });
+    setError(null);
+    setSuccess(null);
     setModalOpen(true);
   };
 
-  const handleOpenEdit = (item: ComplianceFinding) => {
+  const handleOpenEdit = (item: Finding) => {
     setEditingItem(item);
-    setForm(item);
+    setForm({
+      proponent_id: item.proponent_id,
+      finding_title: item.finding_title,
+      inspection_area: item.inspection_area ?? '',
+      compliance_status: item.compliance_status,
+      risk_level: item.risk_level,
+      corrective_action: item.corrective_action ?? '',
+      action_deadline: item.action_deadline ?? '',
+      responsible_party: item.responsible_party ?? '',
+      action_status: item.action_status,
+    });
+    setError(null);
+    setSuccess(null);
     setModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this compliance finding record?')) {
-      const currentData = getStorageData();
-      currentData.findings = currentData.findings.filter((f) => f.id !== id);
-      saveStorageData(currentData);
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this compliance finding record?')) return;
+    setDeletingId(id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await adminApi.deleteFinding(id);
+      setSuccess('Finding deleted.');
+      await load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentData = getStorageData();
-    const selectedProp = currentData.proponents.find((p) => p.id === form.proponent_id);
-    const propName = selectedProp?.company_name || 'Unknown Proponent';
-
-    if (editingItem) {
-      currentData.findings = currentData.findings.map((f) =>
-        f.id === editingItem.id
-          ? { ...(form as ComplianceFinding), proponent_name: propName, updated_date: new Date().toISOString() }
-          : f
-      );
-    } else {
-      const newFinding: ComplianceFinding = {
-        ...(form as ComplianceFinding),
-        id: 'find-' + Math.random().toString(36).substring(2, 9),
-        proponent_name: propName,
-        created_date: new Date().toISOString(),
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const payload = {
+        proponent_id: form.proponent_id,
+        finding_title: form.finding_title,
+        inspection_area: form.inspection_area || null,
+        compliance_status: form.compliance_status,
+        risk_level: form.risk_level,
+        corrective_action: form.corrective_action || null,
+        action_deadline: form.action_deadline || null,
+        responsible_party: form.responsible_party || null,
+        action_status: form.action_status,
       };
-      currentData.findings.unshift(newFinding);
+      if (editingItem) {
+        await adminApi.updateFinding(editingItem.id, payload);
+        setSuccess('Finding updated.');
+      } else {
+        await adminApi.createFinding(payload);
+        setSuccess('Finding created.');
+      }
+      setModalOpen(false);
+      await load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
     }
-
-    saveStorageData(currentData);
-    setModalOpen(false);
   };
 
-  const filteredFindings = data.findings.filter((f) => {
-    const term = searchTerm.toLowerCase();
-    const matchSearch =
-      f.proponent_name.toLowerCase().includes(term) ||
-      f.finding_title.toLowerCase().includes(term) ||
-      f.inspection_area.toLowerCase().includes(term) ||
-      f.corrective_action.toLowerCase().includes(term);
-
-    const matchRisk = filterRisk === 'all' || f.risk_level === filterRisk;
-    if (!matchSearch || !matchRisk) return false;
-
-    if (dateRange) {
-      if (dateRange.startDate && f.action_deadline < dateRange.startDate) return false;
-      if (dateRange.endDate && f.action_deadline > dateRange.endDate) return false;
+  const handleWorkflow = async (id: string, action: WorkflowAction) => {
+    setWorkflowBusy({ id, action });
+    setError(null);
+    setSuccess(null);
+    try {
+      await workflowsApi.findingWorkflow(id, action);
+      setSuccess(`Workflow action "${WORKFLOW_LABELS[action]}" completed.`);
+      await load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setWorkflowBusy(null);
     }
+  };
 
-    return true;
-  });
+  const totalPages = pagination?.total_pages ?? 1;
 
   return (
     <div className="space-y-6 font-sans">
@@ -129,15 +241,16 @@ export const AdminFindings: React.FC = () => {
         </button>
       </div>
 
-      <DateRangeFilter onDateChange={(range) => setDateRange(range)} label="Filter Audit Findings by Action Deadline" />
-
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3 w-full sm:w-auto flex-1">
           <Search className="w-4 h-4 text-gray-400" />
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search findings by title, proponent, or inspection area..."
             className="w-full text-xs focus:outline-none"
           />
@@ -147,7 +260,10 @@ export const AdminFindings: React.FC = () => {
           <span className="font-mono text-[10px] text-gray-500 font-bold uppercase">Risk Filter:</span>
           <select
             value={filterRisk}
-            onChange={(e) => setFilterRisk(e.target.value)}
+            onChange={(e) => {
+              setFilterRisk(e.target.value);
+              setPage(1);
+            }}
             className="p-1.5 border border-gray-300 rounded-lg bg-white font-mono text-xs focus:outline-none focus:border-[#D4AF37]"
           >
             <option value="all">All Risks</option>
@@ -157,6 +273,17 @@ export const AdminFindings: React.FC = () => {
           </select>
         </div>
       </div>
+
+      {success && (
+        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {success}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -170,18 +297,27 @@ export const AdminFindings: React.FC = () => {
                 <th className="p-3">Corrective Action</th>
                 <th className="p-3">Deadline</th>
                 <th className="p-3">Action Status</th>
+                <th className="p-3">Workflow</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
-              {filteredFindings.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-gray-500 italic">
+                  <td colSpan={9} className="p-6 text-center">
+                    <span className="inline-flex items-center gap-2 text-gray-500 italic">
+                      <Loader2 className="w-4 h-4 text-[#D4AF37] animate-spin" /> Loading findings…
+                    </span>
+                  </td>
+                </tr>
+              ) : findings.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="p-6 text-center text-gray-500 italic">
                     No findings recorded.
                   </td>
                 </tr>
               ) : (
-                filteredFindings.map((f) => (
+                findings.map((f) => (
                   <tr key={f.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-bold text-[#0A2E24]">{f.proponent_name}</td>
                     <td className="p-3 space-y-0.5">
@@ -199,18 +335,38 @@ export const AdminFindings: React.FC = () => {
                     <td className="p-3">
                       <ActionStatusBadge status={f.action_status} />
                     </td>
+                    <td className="p-3">
+                      <div className="flex flex-wrap gap-1">
+                        {workflowButtons(f).map((action) => (
+                          <button
+                            key={action}
+                            disabled={workflowBusy !== null}
+                            onClick={() => handleWorkflow(f.id, action)}
+                            className="px-1.5 py-0.5 rounded border border-[#D4AF37]/60 bg-[#D4AF37]/10 text-[#0A2E24] font-bold text-[10px] hover:bg-[#D4AF37]/25 transition-colors disabled:opacity-50"
+                          >
+                            {workflowBusy?.id === f.id && workflowBusy.action === action ? 'Working…' : WORKFLOW_LABELS[action]}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
                     <td className="p-3 text-right space-x-2">
                       <button
                         onClick={() => handleOpenEdit(f)}
-                        className="p-1.5 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] rounded-lg transition-colors"
+                        disabled={deletingId !== null}
+                        className="p-1.5 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] rounded-lg transition-colors disabled:opacity-50"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(f.id)}
-                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                        disabled={deletingId !== null}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {deletingId === f.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -218,6 +374,26 @@ export const AdminFindings: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 text-xs">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#0A2E24] font-bold rounded-lg disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="font-mono text-[11px] text-gray-500 font-bold">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#0A2E24] font-bold rounded-lg disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -242,7 +418,8 @@ export const AdminFindings: React.FC = () => {
                   onChange={(e) => setForm({ ...form, proponent_id: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37] bg-white"
                 >
-                  {data.proponents.map((prop) => (
+                  {proponents.length === 0 && <option value="">No proponents available</option>}
+                  {proponents.map((prop) => (
                     <option key={prop.id} value={prop.id}>
                       {prop.company_name}
                     </option>
@@ -278,7 +455,7 @@ export const AdminFindings: React.FC = () => {
                   <label className="block font-bold text-gray-700 mb-1">Compliance Status</label>
                   <select
                     value={form.compliance_status}
-                    onChange={(e) => setForm({ ...form, compliance_status: e.target.value as ComplianceStatus })}
+                    onChange={(e) => setForm({ ...form, compliance_status: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37] bg-white"
                   >
                     <option value="Compliant">Compliant</option>
@@ -294,7 +471,7 @@ export const AdminFindings: React.FC = () => {
                   <label className="block font-bold text-gray-700 mb-1">Risk Level</label>
                   <select
                     value={form.risk_level}
-                    onChange={(e) => setForm({ ...form, risk_level: e.target.value as RiskLevel })}
+                    onChange={(e) => setForm({ ...form, risk_level: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37] bg-white"
                   >
                     <option value="High">High Risk</option>
@@ -307,10 +484,11 @@ export const AdminFindings: React.FC = () => {
                   <label className="block font-bold text-gray-700 mb-1">Action Status</label>
                   <select
                     value={form.action_status}
-                    onChange={(e) => setForm({ ...form, action_status: e.target.value as ActionStatus })}
+                    onChange={(e) => setForm({ ...form, action_status: e.target.value })}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37] bg-white"
                   >
                     <option value="Open">Open</option>
+                    <option value="Pending">Pending</option>
                     <option value="In progress">In progress</option>
                     <option value="Submitted for review">Submitted for review</option>
                     <option value="Verified">Verified & Closed</option>
@@ -357,15 +535,17 @@ export const AdminFindings: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg"
+                  disabled={saving}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-lg"
+                  disabled={saving}
+                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-lg disabled:opacity-50"
                 >
-                  Save Finding
+                  {saving ? 'Saving…' : 'Save Finding'}
                 </button>
               </div>
             </form>

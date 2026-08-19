@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Send, CheckCircle2, MessageSquare, Clock, Building2 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
-import { CONTACT_INFO, sendEmailNotification } from '../../lib/notifications';
+import { CONTACT_INFO } from '../../lib/notifications';
 
 export const ClientContact: React.FC = () => {
   const { user, proponent } = useAuth();
@@ -19,14 +19,11 @@ export const ClientContact: React.FC = () => {
     e.preventDefault();
     if (!form.message.trim()) return;
 
-    sendEmailNotification({
-      to: CONTACT_INFO.email,
-      subject: `[AEC Client Inquiry] ${form.subject || 'General Inquiry'} - ${form.name}`,
-      body: `Direct inquiry from the client portal.\n\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\nSubject: ${form.subject}\n\nMessage:\n${form.message}`,
-      notificationType: 'Service request',
-      proponentId: proponent?.id,
-    });
+    const subject = `[AEC Client Inquiry] ${form.subject || 'General Inquiry'} - ${form.name}`;
+    const body = `Direct inquiry from the client portal.\n\nName: ${form.name}\nEmail: ${form.email}\nPhone: ${form.phone}\nSubject: ${form.subject}\n\nMessage:\n${form.message}`;
+    const mailtoUrl = `mailto:${CONTACT_INFO.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
+    window.location.href = mailtoUrl;
     setSubmitted(true);
   };
 
@@ -110,9 +107,9 @@ export const ClientContact: React.FC = () => {
           {submitted ? (
             <div className="p-8 bg-emerald-50 rounded-2xl border border-emerald-200 text-center space-y-3">
               <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
-              <h3 className="font-heading font-extrabold text-base text-[#0A2E24]">Message Sent Successfully!</h3>
+              <h3 className="font-heading font-extrabold text-base text-[#0A2E24]">Message Prepared!</h3>
               <p className="text-xs text-gray-600">
-                Thank you for reaching out to Ansumana Environmental Consultancy Inc. We will respond to <strong>{form.email}</strong> within 1 business day.
+                Your email client has been opened with your inquiry addressed to <strong>{CONTACT_INFO.email}</strong>. Simply press send to deliver your message to the AEC team.
               </p>
               <button
                 onClick={() => setSubmitted(false)}

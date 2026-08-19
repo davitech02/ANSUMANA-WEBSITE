@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Send, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { BookingService, Booking } from '../types';
-import { getStorageData, saveStorageData } from '../lib/storage';
-import { sendEmailNotification, AEC_ADMIN_EMAIL } from '../lib/notifications';
+import { publicApi } from '../lib/api';
+import { BookingService } from '../types';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
+
+type SubmittedBooking = Awaited<ReturnType<typeof publicApi.submitPublicBooking>>;
 
 export const BookSession: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -22,8 +27,9 @@ export const BookSession: React.FC = () => {
     message: '',
   });
 
-  const [submitted, setSubmitted] = useState<Booking | null>(null);
+  const [submitted, setSubmitted] = useState<SubmittedBooking | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     // Default preferred date to 3 days from today
@@ -37,52 +43,30 @@ export const BookSession: React.FC = () => {
     }));
   }, [preselectedService]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const data = getStorageData();
-
-      const newBooking: Booking = {
-        id: 'book-' + Math.random().toString(36).substring(2, 9),
+    try {
+      const booking = await publicApi.submitPublicBooking({
         full_name: formData.fullName,
-        company_name: formData.companyName || 'N/A',
+        company_name: formData.companyName,
         email: formData.email,
         phone: formData.phone,
         whatsapp_number: formData.whatsappNumber || formData.phone,
         service_needed: formData.serviceNeeded,
         preferred_date: formData.preferredDate,
         preferred_time: formData.preferredTime,
-        project_location: formData.projectLocation || 'AEC Paynesville Office / Online',
+        project_location: formData.projectLocation,
         message: formData.message,
-        booking_status: 'Confirmed',
-        meeting_link: 'https://meet.google.com/aec-consultation-' + Math.floor(100 + Math.random() * 900),
-        created_date: new Date().toISOString(),
-      };
-
-      data.bookings.unshift(newBooking);
-      saveStorageData(data);
-
-      // Email Client
-      sendEmailNotification({
-        to: formData.email,
-        subject: `Booking Confirmed: ${formData.serviceNeeded} with AEC Consultants`,
-        body: `Dear ${formData.fullName}, your consultation session (${formData.serviceNeeded}) is confirmed for ${formData.preferredDate} at ${formData.preferredTime}. Meeting Link: ${newBooking.meeting_link}`,
-        notificationType: 'Booking confirmation',
       });
-
-      // Email Admin
-      sendEmailNotification({
-        to: AEC_ADMIN_EMAIL,
-        subject: `New Consultation Booking: ${formData.serviceNeeded} - ${formData.companyName || formData.fullName}`,
-        body: `New booking received from ${formData.fullName} (${formData.companyName}). Date: ${formData.preferredDate} @ ${formData.preferredTime}. Contact: ${formData.phone}`,
-        notificationType: 'Booking confirmation',
-      });
-
+      setSubmitted(booking);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
       setLoading(false);
-      setSubmitted(newBooking);
-    }, 600);
+    }
   };
 
   return (
@@ -119,10 +103,10 @@ export const BookSession: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <span className="text-[#D4AF37] font-mono text-xs tracking-widest uppercase font-bold">
-                  Session Confirmed
+                  Booking Received
                 </span>
                 <h3 className="font-heading font-extrabold text-2xl sm:text-3xl text-[#0A2E24]">
-                  Consultation Booking Successfully Reserved!
+                  Consultation Booking Request Submitted!
                 </h3>
               </div>
 
@@ -136,20 +120,19 @@ export const BookSession: React.FC = () => {
                   <span className="font-bold text-[#0A2E24]">{submitted.preferred_date} @ {submitted.preferred_time}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-2 text-xs">
-                  <span className="text-gray-500 font-mono">Meeting Link:</span>
-                  <a
-                    href={submitted.meeting_link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-bold text-blue-600 underline"
-                  >
-                    Open Google Meet
-                  </a>
+                  <span className="text-gray-500 font-mono">Email:</span>
+                  <span className="font-bold text-[#0A2E24]">{submitted.email}</span>
+                </div>
+                <div className="flex justify-between pb-2 text-xs">
+                  <span className="text-gray-500 font-mono">Status:</span>
+                  <span className="font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                    Pending
+                  </span>
                 </div>
               </div>
 
               <p className="text-xs text-gray-600 max-w-md mx-auto">
-                A confirmation email and WhatsApp notification with calendar invite details have been dispatched to <strong className="text-[#0A2E24]">{submitted.email}</strong>.
+                Your booking has been received and is marked as <strong className="text-[#0A2E24]">Pending</strong>. AEC will review your request and confirm your consultation by email to <strong className="text-[#0A2E24]">{submitted.email}</strong>.
               </p>
 
               <div className="pt-4 flex justify-center gap-4">
@@ -169,6 +152,12 @@ export const BookSession: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold">
+                  {error}
+                </div>
+              )}
+
               <div className="border-b border-gray-200 pb-4 flex items-center justify-between">
                 <div>
                   <span className="text-[#D4AF37] font-mono text-[10px] tracking-widest uppercase font-bold block">
@@ -316,7 +305,7 @@ export const BookSession: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E5C964] text-[#0A2E24] font-heading font-bold text-sm hover:from-[#E5C964] hover:to-[#D4AF37] shadow-xl transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#E5C964] text-[#0A2E24] font-heading font-bold text-sm hover:from-[#E5C964] hover:to-[#D4AF37] shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span>Processing Booking...</span>

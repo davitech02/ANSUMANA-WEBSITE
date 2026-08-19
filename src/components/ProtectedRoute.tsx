@@ -9,8 +9,20 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ requiredRole, allowedRole, children }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isRestoring, user } = useAuth();
   const targetRole = requiredRole || allowedRole;
+
+  // Wait for the persisted session to be restored before deciding to redirect.
+  if (isRestoring) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#14231E] flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-mono text-gray-500">Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;

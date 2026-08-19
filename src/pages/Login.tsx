@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogIn, Lock, Mail, Shield, AlertCircle, ArrowRight } from 'lucide-react';
+import { Lock, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { getStorageData } from '../lib/storage';
 
 const LOGO_URL = 'https://media.base44.com/images/public/6a41d19b1eb6cd6bf679b527/c2b37abf0_ChatGPTImageJul28202601_07_19AM.png';
 
@@ -11,42 +10,21 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login, switchRole } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const navigateByActiveRole = () => {
-    const activeId = localStorage.getItem('aec_active_user_id');
-    const activeUser = getStorageData().users.find((u) => u.id === activeId);
-    if (activeUser?.role === 'admin') {
-      navigate('/admin');
-    } else {
-      navigate('/portal');
-    }
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const res = login(email, password);
-      setLoading(false);
-      if (res.success) {
-        navigateByActiveRole();
-      } else {
-        setError(res.error || 'Login failed.');
-      }
-    }, 400);
-  };
-
-  const quickDemoLogin = (type: 'admin' | 'client') => {
-    if (type === 'admin') {
-      switchRole('admin');
+    const res = await login(email, password);
+    setLoading(false);
+    if (res.success) {
+      navigate(res.role === 'admin' ? '/admin' : '/portal');
     } else {
-      switchRole('client', 'compliance@liberiagold.lr');
+      setError(res.error || 'Login failed.');
     }
-    navigateByActiveRole();
   };
 
   return (
@@ -91,7 +69,7 @@ export const Login: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@ansumanaenv.com or client@company.sl"
+                placeholder="you@company.lr"
                 className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37]"
               />
             </div>
@@ -125,25 +103,6 @@ export const Login: React.FC = () => {
             {loading ? 'Authenticating...' : 'Sign In to Portal'}
           </button>
         </form>
-
-        {/* Quick Demo Credentials Switcher */}
-        <div className="pt-4 border-t border-white/10 space-y-2 text-center">
-          <p className="text-[11px] text-gray-400 font-mono">DEMO ONE-CLICK LOGIN:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => quickDemoLogin('admin')}
-              className="py-2 px-3 bg-[#1A4A3A] hover:bg-[#2A6A52] text-[#D4AF37] border border-[#D4AF37]/30 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Shield className="w-3.5 h-3.5" /> Admin Demo
-            </button>
-            <button
-              onClick={() => quickDemoLogin('client')}
-              className="py-2 px-3 bg-white/10 hover:bg-white/20 text-gray-200 border border-white/20 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
-            >
-              <LogIn className="w-3.5 h-3.5 text-[#D4AF37]" /> Client Demo
-            </button>
-          </div>
-        </div>
 
         <div className="text-center pt-2 text-xs text-gray-400">
           New proponent company?{' '}

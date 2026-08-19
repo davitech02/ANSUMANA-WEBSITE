@@ -1,14 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { CalendarClock, Plus, Edit, Trash2, X, Send, Search } from 'lucide-react';
-import { ReportSchedule, ReportType, ReportStatus } from '../../types';
-import { getStorageData, saveStorageData } from '../../lib/storage';
-import { sendEmailNotification } from '../../lib/notifications';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CalendarClock, Plus, Edit, Trash2, X, Search, Loader2, AlertCircle } from 'lucide-react';
+import type { ReportSchedule, ReportType, ReportStatus, Permit, Proponent, Pagination } from '../../types';
+import { adminApi } from '../../lib/api';
 import { DateRangeFilter, DateRange } from '../../components/common/DateRangeFilter';
 
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
+
+const PER_PAGE = 25;
+
 export const AdminSchedules: React.FC = () => {
-  const [data, setData] = useState(() => getStorageData());
+  const [items, setItems] = useState<ReportSchedule[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterReportType, setFilterReportType] = useState('');
+  const [proponents, setProponents] = useState<Proponent[]>([]);
+  const [permits, setPermits] = useState<Permit[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ReportSchedule | null>(null);
 
@@ -19,24 +34,74 @@ export const AdminSchedules: React.FC = () => {
     reporting_period: 'Q3-Q4 2026 Audit Period',
     due_date: '',
     status: 'Pending',
-    reminder_30_sent: false,
-    reminder_14_sent: false,
-    reminder_7_sent: false,
-    reminder_1_sent: false,
-    reminder_due_sent: false,
-    reminder_overdue_sent: false,
   });
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await adminApi.listSchedules({
+        page,
+        per_page: PER_PAGE,
+        q: searchTerm || undefined,
+        status: filterStatus || undefined,
+        report_type: filterReportType || undefined,
+      });
+      setItems(res.items);
+      setPagination(res.pagination);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [page, searchTerm, filterStatus, filterReportType]);
+
   useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    adminApi
+      .listProponents({ page: 1, per_page: 100 })
+      .then((res) => {
+        if (active) setProponents(res.items);
+      })
+      .catch(() => {
+        if (active) setProponents([]);
+      });
+    adminApi
+      .listPermits({ page: 1, per_page: 100 })
+      .then((res) => {
+        if (active) setPermits(res.items);
+      })
+      .catch(() => {
+        if (active) setPermits([]);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(null), 3000);
+    return () => clearTimeout(t);
+  }, [success]);
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setPage(1);
+  };
+
+  const proponentPermits = form.proponent_id
+    ? permits.filter((p) => p.proponent_id === form.proponent_id)
+    : permits;
 
   const handleOpenAdd = () => {
     setEditingItem(null);
-    const defaultProp = data.proponents[0]?.id || '';
-    const defaultPermit = data.permits.find((p) => p.proponent_id === defaultProp)?.id || '';
+    const defaultProp = proponents[0]?.id || '';
+    const defaultPermit = permits.find((p) => p.proponent_id === defaultProp)?.id || '';
 
     const d = new Date();
     d.setDate(d.getDate() + 14);
@@ -49,12 +114,6 @@ export const AdminSchedules: React.FC = () => {
       reporting_period: 'Q3-Q4 2026 Audit Period',
       due_date: dateStr,
       status: 'Pending',
-      reminder_30_sent: false,
-      reminder_14_sent: false,
-      reminder_7_sent: false,
-      reminder_1_sent: false,
-      reminder_due_sent: false,
-      reminder_overdue_sent: false,
     });
     setModalOpen(true);
   };
@@ -65,72 +124,57 @@ export const AdminSchedules: React.FC = () => {
     setModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this report schedule entry?')) {
-      const currentData = getStorageData();
-      currentData.schedules = currentData.schedules.filter((s) => s.id !== id);
-      saveStorageData(currentData);
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this report schedule entry?')) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await adminApi.deleteSchedule(id);
+      setSuccess('Schedule deleted successfully.');
+      load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentData = getStorageData();
-    const selectedProp = currentData.proponents.find((p) => p.id === form.proponent_id);
-    const propName = selectedProp?.company_name || 'Unknown Proponent';
-
-    if (editingItem) {
-      currentData.schedules = currentData.schedules.map((s) =>
-        s.id === editingItem.id
-          ? { ...(form as ReportSchedule), proponent_name: propName, updated_date: new Date().toISOString() }
-          : s
-      );
-    } else {
-      const newSched: ReportSchedule = {
-        ...(form as ReportSchedule),
-        id: 'sched-' + Math.random().toString(36).substring(2, 9),
-        proponent_name: propName,
-        created_date: new Date().toISOString(),
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = {
+        proponent_id: form.proponent_id ?? '',
+        permit_id: form.permit_id || null,
+        report_type: form.report_type ?? 'Biannual Monitoring Report',
+        reporting_period: form.reporting_period || null,
+        due_date: form.due_date ?? '',
+        status: form.status ?? 'Pending',
       };
-      currentData.schedules.unshift(newSched);
+      if (editingItem) {
+        await adminApi.updateSchedule(editingItem.id, payload);
+        setSuccess('Schedule updated successfully.');
+      } else {
+        await adminApi.createSchedule(payload);
+        setSuccess('Schedule created successfully.');
+      }
+      setModalOpen(false);
+      load();
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSaving(false);
     }
-
-    saveStorageData(currentData);
-    setModalOpen(false);
   };
 
-  const handleSendReminder = (schedule: ReportSchedule) => {
-    const proponent = data.proponents.find((p) => p.id === schedule.proponent_id);
-    const email = proponent?.email || 'client@company.sl';
-
-    sendEmailNotification({
-      to: email,
-      subject: `[AEC Reminder] ${schedule.report_type} Due Date: ${schedule.due_date}`,
-      body: `Dear ${proponent?.contact_person || 'Proponent'}, your ${schedule.report_type} (${schedule.reporting_period}) is scheduled for submission on ${schedule.due_date}. Please log into the AEC portal to review findings and upload required evidence.`,
-      notificationType: 'Report reminder',
-      proponentId: schedule.proponent_id,
-      reportScheduleId: schedule.id,
-    });
-
-    alert(`Notification logged & dispatched to ${email}`);
-  };
-
-  const filteredSchedules = data.schedules.filter((s) => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch =
-      s.proponent_name.toLowerCase().includes(term) ||
-      s.report_type.toLowerCase().includes(term) ||
-      s.reporting_period.toLowerCase().includes(term);
-
-    if (!matchesSearch) return false;
-
-    if (dateRange) {
-      if (dateRange.startDate && s.due_date < dateRange.startDate) return false;
-      if (dateRange.endDate && s.due_date > dateRange.endDate) return false;
-    }
-
-    return true;
-  });
+  const visibleSchedules = dateRange
+    ? items.filter((s) => {
+        if (dateRange.startDate && s.due_date < dateRange.startDate) return false;
+        if (dateRange.endDate && s.due_date > dateRange.endDate) return false;
+        return true;
+      })
+    : items;
 
   return (
     <div className="space-y-6 font-sans">
@@ -150,17 +194,58 @@ export const AdminSchedules: React.FC = () => {
         </button>
       </div>
 
+      {success && (
+        <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {success}
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 p-3 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+        </div>
+      )}
+
       <DateRangeFilter onDateChange={(range) => setDateRange(range)} label="Filter Audit Schedules by Due Date Range" />
 
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3">
-        <Search className="w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search schedules by proponent, report type, or reporting period..."
-          className="w-full text-xs focus:outline-none"
-        />
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex items-center gap-3 flex-1">
+          <Search className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder="Search schedules by proponent, report type, or reporting period..."
+            className="w-full text-xs focus:outline-none"
+          />
+        </div>
+        <select
+          value={filterStatus}
+          onChange={(e) => {
+            setFilterStatus(e.target.value);
+            setPage(1);
+          }}
+          className="p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#D4AF37]"
+        >
+          <option value="">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Submitted">Submitted</option>
+          <option value="Overdue">Overdue</option>
+          <option value="Completed">Completed</option>
+        </select>
+        <select
+          value={filterReportType}
+          onChange={(e) => {
+            setFilterReportType(e.target.value);
+            setPage(1);
+          }}
+          className="p-2 border border-gray-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#D4AF37]"
+        >
+          <option value="">All Report Types</option>
+          <option value="Environmental Audit Report">Environmental Audit Report</option>
+          <option value="Biannual Monitoring Report">Biannual Monitoring Report</option>
+          <option value="Quarterly Monitoring Report">Quarterly Monitoring Report</option>
+        </select>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -173,21 +258,29 @@ export const AdminSchedules: React.FC = () => {
                 <th className="p-3">Reporting Period</th>
                 <th className="p-3">Due Date</th>
                 <th className="p-3">Status</th>
-                <th className="p-3">Reminders Triggered</th>
+                <th className="p-3">Created</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
-              {filteredSchedules.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center">
+                    <div className="flex items-center justify-center gap-2 text-gray-400">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading schedules…
+                    </div>
+                  </td>
+                </tr>
+              ) : visibleSchedules.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-gray-500 italic">
                     No schedules found.
                   </td>
                 </tr>
               ) : (
-                filteredSchedules.map((s) => (
+                visibleSchedules.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-3 font-bold text-[#0A2E24]">{s.proponent_name}</td>
+                    <td className="p-3 font-bold text-[#0A2E24]">{s.proponent_name || '—'}</td>
                     <td className="p-3 font-semibold">{s.report_type}</td>
                     <td className="p-3 text-gray-600">{s.reporting_period}</td>
                     <td className="p-3 font-mono font-bold text-[#0A2E24]">{s.due_date}</td>
@@ -204,31 +297,21 @@ export const AdminSchedules: React.FC = () => {
                         {s.status}
                       </span>
                     </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1 text-[10px] font-mono">
-                        <span className={`px-1.5 py-0.5 rounded ${s.reminder_30_sent ? 'bg-emerald-100 text-emerald-800 font-bold' : 'bg-gray-100 text-gray-400'}`}>30d</span>
-                        <span className={`px-1.5 py-0.5 rounded ${s.reminder_14_sent ? 'bg-emerald-100 text-emerald-800 font-bold' : 'bg-gray-100 text-gray-400'}`}>14d</span>
-                        <span className={`px-1.5 py-0.5 rounded ${s.reminder_7_sent ? 'bg-emerald-100 text-emerald-800 font-bold' : 'bg-gray-100 text-gray-400'}`}>7d</span>
-                        <span className={`px-1.5 py-0.5 rounded ${s.reminder_1_sent ? 'bg-emerald-100 text-emerald-800 font-bold' : 'bg-gray-100 text-gray-400'}`}>1d</span>
-                      </div>
+                    <td className="p-3 text-[10px] text-gray-500">
+                      {new Date(s.created_at).toLocaleString()}
                     </td>
                     <td className="p-3 text-right space-x-2">
                       <button
-                        onClick={() => handleSendReminder(s)}
-                        className="p-1.5 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] rounded-lg transition-colors"
-                        title="Dispatch Manual Alert"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                      <button
                         onClick={() => handleOpenEdit(s)}
-                        className="p-1.5 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] rounded-lg transition-colors"
+                        disabled={saving}
+                        className="p-1.5 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] rounded-lg transition-colors disabled:opacity-50"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(s.id)}
-                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                        disabled={saving}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -240,6 +323,30 @@ export const AdminSchedules: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {pagination && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-500">
+            Page {pagination.page} of {pagination.total_pages} ({pagination.total} total)
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pagination.page <= 1 || loading}
+              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-lg disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={pagination.page >= pagination.total_pages || loading}
+              className="px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-bold rounded-lg disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -254,6 +361,12 @@ export const AdminSchedules: React.FC = () => {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4 text-xs">
+              {error && (
+                <div className="bg-red-50 p-3 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+              )}
+
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Proponent Company *</label>
                 <select
@@ -261,14 +374,30 @@ export const AdminSchedules: React.FC = () => {
                   value={form.proponent_id}
                   onChange={(e) => {
                     const pid = e.target.value;
-                    const permit = data.permits.find((p) => p.proponent_id === pid)?.id || '';
+                    const permit = permits.find((p) => p.proponent_id === pid)?.id || '';
                     setForm({ ...form, proponent_id: pid, permit_id: permit });
                   }}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37] bg-white"
                 >
-                  {data.proponents.map((prop) => (
+                  {proponents.map((prop) => (
                     <option key={prop.id} value={prop.id}>
                       {prop.company_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Linked Permit</label>
+                <select
+                  value={form.permit_id}
+                  onChange={(e) => setForm({ ...form, permit_id: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37] bg-white"
+                >
+                  <option value="">— No linked permit —</option>
+                  {proponentPermits.map((permit) => (
+                    <option key={permit.id} value={permit.id}>
+                      {permit.permit_number} ({permit.permit_type})
                     </option>
                   ))}
                 </select>
@@ -330,15 +459,17 @@ export const AdminSchedules: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg"
+                  disabled={saving}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-lg"
+                  disabled={saving}
+                  className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold rounded-lg disabled:opacity-50"
                 >
-                  Save Schedule
+                  {saving ? 'Saving…' : 'Save Schedule'}
                 </button>
               </div>
             </form>

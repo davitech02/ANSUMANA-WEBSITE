@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BellRing,
@@ -11,7 +11,7 @@ import {
   CheckCheck,
   Inbox,
 } from 'lucide-react';
-import { getStorageData } from '../../lib/storage';
+import { adminApi, portalApi, workflowsApi } from '../../lib/api';
 
 const READ_KEY = 'aec_notif_read';
 
@@ -49,139 +49,243 @@ function saveReadIds(ids: Set<string>) {
   }
 }
 
-export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ role, proponentId }) => {
+export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ role }) => {
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(getReadIds);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const storageData = useMemo(() => getStorageData(), []);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNotifications() {
+      const items: NotificationItem[] = [];
+      try {
+        if (role === 'admin') {
+          const [schedules, permits, findings, evidence, bookings, requests, logs] =
+            await Promise.all([
+              adminApi.listSchedules({ page: 1, per_page: 50 }),
+              adminApi.listPermits({ page: 1, per_page: 50 }),
+              adminApi.listFindings({ page: 1, per_page: 50 }),
+              adminApi.listEvidence({ page: 1, per_page: 50 }),
+              adminApi.listBookings({ page: 1, per_page: 50 }),
+              adminApi.listServiceRequests({ page: 1, per_page: 50 }),
+              workflowsApi.listNotificationLogs({ page: 1, per_page: 3 }),
+            ]);
 
-  const notifications = useMemo<NotificationItem[]>(() => {
-    const items: NotificationItem[] = [];
-    const pId = proponentId;
+          schedules.items
+            .filter((s) => s.status === 'Overdue')
+            .forEach((s) =>
+              items.push({
+                id: `n-sched-over-${s.id}`,
+                title: `Overdue: ${s.report_type}`,
+                description: `${s.proponent_name || ''} — due ${s.due_date}`,
+                time: s.due_date,
+                icon: Calendar,
+                path: '/admin/schedules',
+                tone: 'red',
+              }),
+            );
 
-    const isMine = (recId?: string) => (role === 'admin' ? true : !pId || recId === pId);
+          schedules.items
+            .filter((s) => s.status === 'Pending')
+            .forEach((s) =>
+              items.push({
+                id: `n-sched-pend-${s.id}`,
+                title: `Report due: ${s.report_type}`,
+                description: `${s.proponent_name || ''} — due ${s.due_date}`,
+                time: s.due_date,
+                icon: Calendar,
+                path: '/admin/schedules',
+                tone: 'amber',
+              }),
+            );
 
-    storageData.schedules
-      .filter((s) => isMine(s.proponent_id) && s.status === 'Overdue')
-      .forEach((s) =>
-        items.push({
-          id: `n-sched-over-${s.id}`,
-          title: `Overdue: ${s.report_type}`,
-          description: `${s.proponent_name} — due ${s.due_date}`,
-          time: s.due_date,
-          icon: Calendar,
-          path: role === 'admin' ? '/admin/schedules' : '/portal/schedules',
-          tone: 'red',
-        }),
-      );
+          permits.items
+            .filter((p) => p.status === 'Expired' || p.status === 'Pending Renewal')
+            .forEach((p) =>
+              items.push({
+                id: `n-permit-${p.id}`,
+                title: `${p.permit_number} ${p.status.toLowerCase()}`,
+                description: p.proponent_name || '',
+                time: p.expiry_date || '',
+                icon: FileCheck,
+                path: '/admin/permits',
+                tone: 'amber',
+              }),
+            );
 
-    storageData.schedules
-      .filter((s) => isMine(s.proponent_id) && s.status === 'Pending')
-      .forEach((s) =>
-        items.push({
-          id: `n-sched-pend-${s.id}`,
-          title: `Report due: ${s.report_type}`,
-          description: `${s.proponent_name} — due ${s.due_date}`,
-          time: s.due_date,
-          icon: Calendar,
-          path: role === 'admin' ? '/admin/schedules' : '/portal/schedules',
-          tone: 'amber',
-        }),
-      );
+          findings.items
+            .filter((f) => f.action_status === 'Open' || f.action_status === 'Overdue')
+            .forEach((f) =>
+              items.push({
+                id: `n-find-${f.id}`,
+                title: `Finding: ${f.finding_title}`,
+                description: `${f.compliance_status} · ${f.risk_level} risk`,
+                time: f.action_deadline || '',
+                icon: AlertTriangle,
+                path: '/admin/findings',
+                tone: 'red',
+              }),
+            );
 
-    storageData.permits
-      .filter((p) => isMine(p.proponent_id) && (p.permit_status === 'Expired' || p.permit_status === 'Pending Renewal'))
-      .forEach((p) =>
-        items.push({
-          id: `n-permit-${p.id}`,
-          title: `${p.permit_number} ${p.permit_status.toLowerCase()}`,
-          description: p.proponent_name,
-          time: p.expiry_date,
-          icon: FileCheck,
-          path: role === 'admin' ? '/admin/permits' : '/portal/permits',
-          tone: 'amber',
-        }),
-      );
+          evidence.items
+            .filter((e) => e.review_status === 'Pending review')
+            .forEach((e) =>
+              items.push({
+                id: `n-ev-${e.id}`,
+                title: 'Evidence pending review',
+                description: e.evidence_title || e.description || e.proponent_name || 'Evidence submission',
+                time: e.created_at,
+                icon: Upload,
+                path: '/admin/evidence',
+                tone: 'blue',
+              }),
+            );
 
-    storageData.findings
-      .filter((f) => isMine(f.proponent_id) && (f.action_status === 'Open' || f.action_status === 'Overdue'))
-      .forEach((f) =>
-        items.push({
-          id: `n-find-${f.id}`,
-          title: `Finding: ${f.finding_title}`,
-          description: `${f.compliance_status} · ${f.risk_level} risk`,
-          time: f.action_deadline,
-          icon: AlertTriangle,
-          path: role === 'admin' ? '/admin/findings' : '/portal/findings',
-          tone: 'red',
-        }),
-      );
+          bookings.items
+            .filter((b) => b.booking_status === 'Confirmed')
+            .forEach((b) =>
+              items.push({
+                id: `n-book-${b.id}`,
+                title: 'Advisory session confirmed',
+                description: `${b.company_name || ''} — ${b.preferred_date || ''} ${b.preferred_time || ''}`,
+                time: b.preferred_date || '',
+                icon: Calendar,
+                path: '/admin/bookings',
+                tone: 'green',
+              }),
+            );
 
-    storageData.evidence
-      .filter((e) => isMine(e.proponent_id) && e.review_status === 'Pending review')
-      .forEach((e) =>
-        items.push({
-          id: `n-ev-${e.id}`,
-          title: 'Evidence pending review',
-          description: e.file_name || e.comment || e.submitted_by || 'Evidence submission',
-          time: e.created_date,
-          icon: Upload,
-          path: role === 'admin' ? '/admin/evidence' : '/portal/evidence',
-          tone: 'blue',
-        }),
-      );
+          requests.items
+            .filter((r) => r.status === 'New')
+            .forEach((r) =>
+              items.push({
+                id: `n-req-${r.id}`,
+                title: `New service request: ${r.service_needed}`,
+                description: `${r.company_name || ''} — ${r.full_name}`,
+                time: r.created_at,
+                icon: FileText,
+                path: '/admin/requests',
+                tone: 'purple',
+              }),
+            );
 
-    storageData.bookings
-      .filter((b) => (role === 'admin' ? true : b.email === userEmailOf(storageData, pId)))
-      .filter((b) => b.booking_status === 'Confirmed')
-      .forEach((b) =>
-        items.push({
-          id: `n-book-${b.id}`,
-          title: 'Advisory session confirmed',
-          description: `${b.company_name} — ${b.preferred_date} ${b.preferred_time}`,
-          time: b.preferred_date,
-          icon: Calendar,
-          path: role === 'admin' ? '/admin/bookings' : '/portal/book',
-          tone: 'green',
-        }),
-      );
+          logs.items.forEach((l) =>
+            items.push({
+              id: `n-log-${l.id}`,
+              title: `${l.channel} — ${l.notification_type}`,
+              description: l.subject || '',
+              time: l.created_at,
+              icon: MessageSquare,
+              path: '/admin/logs',
+              tone: 'gray',
+            }),
+          );
+        } else {
+          const [permits, schedules, findings, evidence, reminders] = await Promise.all([
+            portalApi.listClientPermits(),
+            portalApi.listClientSchedules(),
+            portalApi.listClientFindings(),
+            portalApi.listClientEvidence(),
+            portalApi.listClientReminders(),
+          ]);
 
-    if (role === 'admin') {
-      storageData.requests
-        .filter((r) => r.status === 'New')
-        .forEach((r) =>
-          items.push({
-            id: `n-req-${r.id}`,
-            title: `New service request: ${r.service_needed}`,
-            description: `${r.company_name} — ${r.full_name}`,
-            time: r.created_date,
-            icon: FileText,
-            path: '/admin/requests',
-            tone: 'purple',
-          }),
-        );
+          schedules.items
+            .filter((s) => s.status === 'Overdue')
+            .forEach((s) =>
+              items.push({
+                id: `n-sched-over-${s.id}`,
+                title: `Overdue: ${s.report_type}`,
+                description: `Due ${s.due_date}`,
+                time: s.due_date,
+                icon: Calendar,
+                path: '/portal/schedules',
+                tone: 'red',
+              }),
+            );
+
+          schedules.items
+            .filter((s) => s.status === 'Pending')
+            .forEach((s) =>
+              items.push({
+                id: `n-sched-pend-${s.id}`,
+                title: `Report due: ${s.report_type}`,
+                description: `Due ${s.due_date}`,
+                time: s.due_date,
+                icon: Calendar,
+                path: '/portal/schedules',
+                tone: 'amber',
+              }),
+            );
+
+          permits.items
+            .filter((p) => p.permit_status === 'Expired' || p.permit_status === 'Pending Renewal')
+            .forEach((p) =>
+              items.push({
+                id: `n-permit-${p.id}`,
+                title: `${p.permit_number} ${p.permit_status.toLowerCase()}`,
+                description: 'Requires renewal or status review',
+                time: p.expiry_date || '',
+                icon: FileCheck,
+                path: '/portal/permits',
+                tone: 'amber',
+              }),
+            );
+
+          findings.items
+            .filter((f) => f.action_status === 'Open' || f.action_status === 'Overdue')
+            .forEach((f) =>
+              items.push({
+                id: `n-find-${f.id}`,
+                title: `Finding: ${f.finding_title}`,
+                description: `${f.compliance_status} · ${f.risk_level} risk`,
+                time: f.action_deadline || '',
+                icon: AlertTriangle,
+                path: '/portal/findings',
+                tone: 'red',
+              }),
+            );
+
+          evidence.items
+            .filter((e) => e.review_status === 'Pending review')
+            .forEach((e) =>
+              items.push({
+                id: `n-ev-${e.id}`,
+                title: 'Evidence pending review',
+                description: e.evidence_title || e.description || 'Evidence submission',
+                time: e.created_at,
+                icon: Upload,
+                path: '/portal/evidence',
+                tone: 'blue',
+              }),
+            );
+
+          reminders.items.slice(0, 3).forEach((l) =>
+            items.push({
+              id: `n-log-${l.id}`,
+              title: `${l.channel} — ${l.notification_type}`,
+              description: l.subject || '',
+              time: l.created_at,
+              icon: MessageSquare,
+              path: '/portal/reminders',
+              tone: 'gray',
+            }),
+          );
+        }
+      } catch {
+        /* notification loading is non-critical */
+      }
+
+      if (!cancelled) {
+        setNotifications(items.sort((a, b) => (b.time || '').localeCompare(a.time || '')));
+      }
     }
-
-    storageData.logs
-      .filter((l) => isMine(l.proponent_id))
-      .slice(0, 3)
-      .forEach((l) =>
-        items.push({
-          id: `n-log-${l.id}`,
-          title: `${l.channel} — ${l.notification_type}`,
-          description: l.subject,
-          time: l.created_date,
-          icon: MessageSquare,
-          path: role === 'admin' ? '/admin/logs' : '/portal/reminders',
-          tone: 'gray',
-        }),
-      );
-
-    // Sort newest first by ISO date, fall back to string date
-    return items.sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-  }, [storageData, role, proponentId]);
+    loadNotifications();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
 
   const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
 
@@ -310,9 +414,3 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ role
     </div>
   );
 };
-
-function userEmailOf(data: { users: { id: string; email: string; proponent_id?: string }[] }, pId?: string): string | undefined {
-  if (!pId) return undefined;
-  const u = data.users.find((x) => x.proponent_id === pId || x.id === pId);
-  return u?.email;
-}

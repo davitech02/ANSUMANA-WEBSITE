@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { MapPin, Phone, Mail, MessageSquare, Send, CheckCircle2, AlertCircle } from 'lucide-react';
-import { RequestService, ServiceRequest } from '../types';
-import { getStorageData, saveStorageData } from '../lib/storage';
-import { sendEmailNotification, AEC_ADMIN_EMAIL } from '../lib/notifications';
+import { RequestService } from '../types';
+import { submitPublicServiceRequest } from '../lib/api/public';
 
 export const Contact: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -22,6 +21,7 @@ export const Contact: React.FC = () => {
 
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (preselectedService) {
@@ -29,41 +29,31 @@ export const Contact: React.FC = () => {
     }
   }, [preselectedService]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError('');
 
-    setTimeout(() => {
-      const data = getStorageData();
-
-      const newRequest: ServiceRequest = {
-        id: 'req-' + Math.random().toString(36).substring(2, 9),
+    try {
+      await submitPublicServiceRequest({
         full_name: formData.fullName,
-        company_name: formData.companyName || 'N/A',
+        company_name: formData.companyName || undefined,
         email: formData.email,
         phone: formData.phone,
-        whatsapp_number: formData.whatsappNumber || formData.phone,
+        whatsapp_number: formData.whatsappNumber || undefined,
         service_needed: formData.serviceNeeded,
-        project_location: formData.projectLocation || 'Liberia',
+        project_location: formData.projectLocation || undefined,
         message: formData.message,
-        status: 'New',
-        created_date: new Date().toISOString(),
-      };
-
-      data.requests.unshift(newRequest);
-      saveStorageData(data);
-
-      // Notify Admin
-      sendEmailNotification({
-        to: AEC_ADMIN_EMAIL,
-        subject: `New Service Request: ${formData.serviceNeeded} - ${formData.companyName || formData.fullName}`,
-        body: `New Environmental Service Request received from ${formData.fullName} (${formData.companyName}). Service Needed: ${formData.serviceNeeded}. Location: ${formData.projectLocation}. Message: ${formData.message}. Contact: ${formData.phone} / ${formData.email}`,
-        notificationType: 'Service request',
       });
 
       setLoading(false);
       setSubmitted(true);
-    }, 600);
+    } catch (err) {
+      setLoading(false);
+      setError(
+        err instanceof Error && err.message ? err.message : 'Failed to submit request. Please try again.',
+      );
+    }
   };
 
   return (
@@ -308,6 +298,13 @@ export const Contact: React.FC = () => {
                       className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:border-[#D4AF37]"
                     />
                   </div>
+
+                  {error && (
+                    <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  )}
 
                   <button
                     type="submit"

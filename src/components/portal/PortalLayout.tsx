@@ -24,18 +24,36 @@ import {
   ChevronRight,
   Command,
   CheckCircle2,
-  Sparkles,
   Mail,
   HelpCircle,
   PhoneCall,
   FileText,
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
-import { getStorageData, StorageData } from '../../lib/storage';
+import { adminApi, portalApi, workflowsApi } from '../../lib/api';
 import { ProfileMenu } from '../common/ProfileMenu';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { Breadcrumbs } from '../common/Breadcrumbs';
 import { NotificationDropdown } from '../common/NotificationDropdown';
+
+interface PortalCounts {
+  proponents?: number;
+  permits?: number;
+  schedules?: number;
+  findings?: number;
+  evidence?: number;
+  requests?: number;
+  bookings?: number;
+  sessions?: number;
+  expiring?: number;
+}
+
+interface SearchResultItem {
+  type: string;
+  title: string;
+  subtitle: string;
+  path: string;
+}
 
 const LOGO_URL =
   'https://media.base44.com/images/public/6a41d19b1eb6cd6bf679b527/c2b37abf0_ChatGPTImageJul28202601_07_19AM.png';
@@ -51,23 +69,72 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [storageData, setStorageData] = useState<StorageData>(() => getStorageData());
+  const [counts, setCounts] = useState<PortalCounts>({});
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [showToastBanner, setShowToastBanner] = useState(true);
   const quickActionRef = useRef<HTMLDivElement>(null);
 
-  const { user, proponent, logout, switchRole } = useAuth();
+  const { user, proponent, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const isSectionAdmin = location.pathname.startsWith('/admin');
   const role = isSectionAdmin ? 'admin' : (location.pathname.startsWith('/portal') ? 'client' : (user?.role === 'admin' ? 'admin' : 'client'));
 
-  // Listen to storage changes for live badge updates
+  // Load portal badge/toast counts from the live backend.
   useEffect(() => {
-    const handleUpdate = () => setStorageData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
-  }, []);
+    let cancelled = false;
+    async function loadCounts() {
+      try {
+        if (role === 'admin') {
+          const summary = await workflowsApi.dashboardSummary();
+          if (cancelled) return;
+          setCounts({
+            proponents: summary.proponents.active,
+            permits: summary.permits.expired + summary.permits.pending_renewal,
+            schedules: summary.schedules.overdue + summary.schedules.pending,
+            findings: summary.findings.open,
+            evidence: summary.evidence.pending_review,
+            requests: summary.service_requests.new,
+            bookings: summary.bookings.confirmed,
+            sessions: summary.bookings.confirmed,
+            expiring: summary.permits.expired + summary.permits.pending_renewal,
+          });
+        } else {
+          const [permits, schedules, findings, evidence] = await Promise.all([
+            portalApi.listClientPermits(),
+            portalApi.listClientSchedules(),
+            portalApi.listClientFindings(),
+            portalApi.listClientEvidence(),
+          ]);
+          if (cancelled) return;
+          const pendingSchedules = schedules.items.filter(
+            (s) => s.status === 'Pending' || s.status === 'Overdue',
+          ).length;
+          const openFindings = findings.items.filter((f) => f.action_status === 'Open').length;
+          const pendingEvidence = evidence.items.filter(
+            (e) => e.review_status === 'Pending review',
+          ).length;
+          const expiring = permits.items.filter(
+            (p) => p.permit_status === 'Expired' || p.permit_status === 'Pending Renewal',
+          ).length;
+          setCounts({
+            permits: permits.items.length,
+            schedules: pendingSchedules,
+            findings: openFindings,
+            evidence: pendingEvidence,
+            expiring,
+          });
+        }
+      } catch {
+        /* counts are non-critical; leave them empty */
+      }
+    }
+    loadCounts();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
 
   // Outside click + Escape to close Quick Action
   useEffect(() => {
@@ -101,53 +168,26 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Calculate badge numbers
+  // Calculate badge numbers from the live dashboard/portal data
   const badges = useMemo(() => {
-    const pId = proponent?.id;
-
     if (role === 'admin') {
-      const activeProponents = storageData.proponents.length;
-      const criticalPermits = storageData.permits.filter(
-        (p) => p.permit_status === 'Expired' || p.permit_status === 'Pending Renewal'
-      ).length;
-      const pendingSchedules = storageData.schedules.filter(
-        (s) => s.status === 'Overdue' || s.status === 'Pending'
-      ).length;
-      const openFindings = storageData.findings.filter((f) => f.action_status === 'Open').length;
-      const pendingEvidence = storageData.evidence.filter((e) => e.review_status === 'Pending review').length;
-      const pendingRequests = storageData.requests.filter((r) => r.status === 'New').length;
-      const upcomingBookings = storageData.bookings.filter((b) => b.booking_status === 'Confirmed').length;
-
       return {
-        proponents: activeProponents,
-        permits: criticalPermits > 0 ? criticalPermits : undefined,
-        schedules: pendingSchedules > 0 ? pendingSchedules : undefined,
-        findings: openFindings > 0 ? openFindings : undefined,
-        evidence: pendingEvidence > 0 ? pendingEvidence : undefined,
-        requests: pendingRequests > 0 ? pendingRequests : undefined,
-        bookings: upcomingBookings > 0 ? upcomingBookings : undefined,
-      };
-    } else {
-      // Client role badges
-      const myPermits = storageData.permits.filter((p) => p.proponent_id === pId).length;
-      const myDeadlines = storageData.schedules.filter(
-        (s) => s.proponent_id === pId && (s.status === 'Pending' || s.status === 'Overdue')
-      ).length;
-      const myFindings = storageData.findings.filter(
-        (f) => f.proponent_id === pId && f.action_status === 'Open'
-      ).length;
-      const myEvidence = storageData.evidence.filter(
-        (e) => e.proponent_id === pId && e.review_status === 'Pending review'
-      ).length;
-
-      return {
-        permits: myPermits,
-        schedules: myDeadlines > 0 ? myDeadlines : undefined,
-        findings: myFindings > 0 ? myFindings : undefined,
-        evidence: myEvidence > 0 ? myEvidence : undefined,
+        proponents: counts.proponents,
+        permits: counts.permits && counts.permits > 0 ? counts.permits : undefined,
+        schedules: counts.schedules && counts.schedules > 0 ? counts.schedules : undefined,
+        findings: counts.findings && counts.findings > 0 ? counts.findings : undefined,
+        evidence: counts.evidence && counts.evidence > 0 ? counts.evidence : undefined,
+        requests: counts.requests && counts.requests > 0 ? counts.requests : undefined,
+        bookings: counts.bookings && counts.bookings > 0 ? counts.bookings : undefined,
       };
     }
-  }, [storageData, role, proponent]);
+    return {
+      permits: counts.permits,
+      schedules: counts.schedules && counts.schedules > 0 ? counts.schedules : undefined,
+      findings: counts.findings && counts.findings > 0 ? counts.findings : undefined,
+      evidence: counts.evidence && counts.evidence > 0 ? counts.evidence : undefined,
+    };
+  }, [counts, role]);
 
   // Grouped Navigation Items matching reference image
   const adminNavGroups = [
@@ -220,8 +260,8 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
     { name: 'Uploads', path: '/portal/evidence', icon: Upload, badge: badges.evidence },
   ];
 
-  const handleSignOut = () => {
-    logout();
+  const handleSignOut = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -258,73 +298,93 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
   };
 
   // Notifications for toast banner
-  const upcomingSessionsList = useMemo(() => {
-    return storageData.bookings.filter((b) => b.booking_status === 'Confirmed');
-  }, [storageData.bookings]);
+  const upcomingSessionsCount = counts.sessions || 0;
+  const expiringPermitsCount = counts.expiring || 0;
 
-  const expiringPermitsList = useMemo(() => {
-    return storageData.permits.filter(
-      (p) =>
-        p.permit_status === 'Expired' ||
-        p.permit_status === 'Pending Renewal'
-    );
-  }, [storageData.permits]);
-
-  // Search Results inside Command Palette
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
+  // Search Results inside Command Palette (pages + live records)
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
     const q = searchQuery.toLowerCase();
+    const handle = window.setTimeout(async () => {
+      const items: SearchResultItem[] = [];
 
-    const items: { type: string; title: string; subtitle: string; path: string }[] = [];
-
-    // Search Pages
-    navGroups.forEach((g) => {
-      g.items.forEach((item) => {
-        if (item.name.toLowerCase().includes(q)) {
-          items.push({
-            type: 'Page Navigation',
-            title: item.name,
-            subtitle: g.groupTitle,
-            path: item.path,
-          });
-        }
+      // Search Pages
+      navGroups.forEach((g) => {
+        g.items.forEach((item) => {
+          if (item.name.toLowerCase().includes(q)) {
+            items.push({
+              type: 'Page Navigation',
+              title: item.name,
+              subtitle: g.groupTitle,
+              path: item.path,
+            });
+          }
+        });
       });
-    });
 
-    // Search Permits
-    storageData.permits.forEach((p) => {
-      if (
-        p.permit_number.toLowerCase().includes(q) ||
-        p.permit_type.toLowerCase().includes(q) ||
-        p.proponent_name.toLowerCase().includes(q)
-      ) {
-        items.push({
-          type: 'EPA Permit Record',
-          title: `${p.permit_number} (${p.permit_type})`,
-          subtitle: `Proponent: ${p.proponent_name} • Status: ${p.permit_status}`,
-          path: role === 'admin' ? '/admin/permits' : '/portal/permits',
-        });
+      try {
+        if (role === 'admin') {
+          const [permits, proponents] = await Promise.all([
+            adminApi.listPermits({ q: searchQuery.trim(), page: 1, per_page: 8 }),
+            adminApi.listProponents({ q: searchQuery.trim(), page: 1, per_page: 8 }),
+          ]);
+          permits.items.forEach((p) => {
+            items.push({
+              type: 'EPA Permit Record',
+              title: `${p.permit_number} (${p.permit_type})`,
+              subtitle: `Proponent: ${p.proponent_name || ''} • Status: ${p.status}`,
+              path: '/admin/permits',
+            });
+          });
+          proponents.items.forEach((prop) => {
+            items.push({
+              type: 'Proponent Company',
+              title: prop.company_name,
+              subtitle: `${prop.contact_person} • ${prop.county || ''}, Liberia`,
+              path: '/admin/proponents',
+            });
+          });
+        } else {
+          const [permits, schedules] = await Promise.all([
+            portalApi.listClientPermits(),
+            portalApi.listClientSchedules(),
+          ]);
+          permits.items
+            .filter(
+              (p) =>
+                p.permit_number.toLowerCase().includes(q) ||
+                p.permit_type.toLowerCase().includes(q),
+            )
+            .forEach((p) => {
+              items.push({
+                type: 'EPA Permit Record',
+                title: `${p.permit_number} (${p.permit_type})`,
+                subtitle: `Status: ${p.permit_status}`,
+                path: '/portal/permits',
+              });
+            });
+          schedules.items
+            .filter((s) => s.report_type.toLowerCase().includes(q))
+            .forEach((s) => {
+              items.push({
+                type: 'Report Schedule',
+                title: s.report_type,
+                subtitle: `Due: ${s.due_date} • ${s.status}`,
+                path: '/portal/schedules',
+              });
+            });
+        }
+      } catch {
+        /* search failures are non-critical */
       }
-    });
 
-    // Search Proponents
-    storageData.proponents.forEach((prop) => {
-      if (
-        prop.company_name.toLowerCase().includes(q) ||
-        prop.contact_person.toLowerCase().includes(q) ||
-        prop.email.toLowerCase().includes(q)
-      ) {
-        items.push({
-          type: 'Proponent Company',
-          title: prop.company_name,
-          subtitle: `${prop.contact_person} • ${prop.county}, Liberia`,
-          path: role === 'admin' ? '/admin/proponents' : '/portal/company',
-        });
-      }
-    });
-
-    return items.slice(0, 8);
-  }, [searchQuery, navGroups, storageData, role]);
+      setSearchResults(items.slice(0, 8));
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [searchQuery, navGroups, role]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row font-sans text-gray-800 antialiased selection:bg-[#D4AF37] selection:text-[#0A2E24]">
@@ -451,42 +511,6 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
             </div>
           ))}
         </nav>
-
-        {/* Demo Role Switcher Drawer Banner */}
-        <div className="p-3 bg-[#1A4A3A]/50 border-t border-white/10 space-y-2">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase text-[#D4AF37]">
-            <span>Demo View Switcher</span>
-            <Sparkles className="w-3 h-3 text-[#D4AF37]" />
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              onClick={() => {
-                switchRole('admin');
-                navigate('/admin');
-              }}
-              className={`py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all shadow-sm ${
-                role === 'admin'
-                  ? 'bg-[#D4AF37] text-[#0A2E24] font-bold'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Admin View
-            </button>
-            <button
-              onClick={() => {
-                switchRole('client', 'compliance@liberiagold.lr');
-                navigate('/portal');
-              }}
-              className={`py-1.5 px-2 rounded-lg text-[10px] font-semibold transition-all shadow-sm ${
-                role === 'client'
-                  ? 'bg-[#D4AF37] text-[#0A2E24] font-bold'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-              }`}
-            >
-              Client View
-            </button>
-          </div>
-        </div>
 
         {/* Bottom Actions */}
         <div className="p-3 border-t border-white/10 bg-[#08241C] space-y-1">
@@ -672,7 +696,6 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
             <ProfileMenu
               variant="light"
               onViewAccount={() => setProfileModalOpen(true)}
-              showRoleSwitcher
               onLogout={handleSignOut}
             />
           </div>
@@ -694,7 +717,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
         {/* Dynamic Outlet Page Content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4">
           {/* Upcoming Sessions / Expiring Permits Toast Banner */}
-          {showToastBanner && (upcomingSessionsList.length > 0 || expiringPermitsList.length > 0) && (
+          {showToastBanner && (upcomingSessionsCount > 0 || expiringPermitsCount > 0) && (
             <div className="bg-gradient-to-r from-[#0A2E24] via-[#1A4A3A] to-[#0A2E24] text-white p-3.5 rounded-2xl shadow-lg border border-[#D4AF37]/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fadeIn">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-[#D4AF37] text-[#0A2E24] flex items-center justify-center shrink-0 shadow-sm font-bold">
@@ -706,7 +729,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
                     <span className="px-1.5 py-0.2 bg-red-500 text-white rounded text-[9px] font-mono">ACTION REQUIRED</span>
                   </p>
                   <p className="text-xs text-gray-200 mt-0.5">
-                    You have <strong className="text-white underline">{upcomingSessionsList.length} confirmed advisory sessions</strong> booked and <strong className="text-[#D4AF37] underline">{expiringPermitsList.length} EPA permits</strong> requiring renewal or status review.
+                    You have <strong className="text-white underline">{upcomingSessionsCount} confirmed advisory sessions</strong> booked and <strong className="text-[#D4AF37] underline">{expiringPermitsCount} EPA permits</strong> requiring renewal or status review.
                   </p>
                 </div>
               </div>

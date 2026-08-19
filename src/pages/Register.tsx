@@ -15,20 +15,18 @@ export const Register: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    setTimeout(() => {
-      const res = register(fullName, email, companyName);
-      setLoading(false);
-      if (res.success) {
-        navigate('/portal');
-      } else {
-        setError(res.error || 'Registration failed.');
-      }
-    }, 500);
+    const res = await register(fullName, email, password, companyName);
+    setLoading(false);
+    if (res.success) {
+      navigate('/portal');
+    } else {
+      setError(res.error || 'Registration failed.');
+    }
   };
 
   return (

@@ -1,24 +1,44 @@
 import React, { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Lock, CheckCircle2 } from 'lucide-react';
+import { Lock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { authApi } from '../lib/api';
 
 export const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token') || 'demo-token';
-  const email = searchParams.get('email') || 'client@company.sl';
+  const token = searchParams.get('token') || '';
+  const email = searchParams.get('email') || '';
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     if (password !== confirmPassword) {
-      alert('Passwords do not match.');
+      setError('Passwords do not match.');
       return;
     }
-    setDone(true);
+    if (!token) {
+      setError('Missing or invalid reset token.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await authApi.resetPassword({ token, password, confirm: confirmPassword });
+      setDone(true);
+    } catch (err) {
+      setError(
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : 'Reset failed. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -28,6 +48,13 @@ export const ResetPassword: React.FC = () => {
           <h2 className="font-heading font-extrabold text-2xl text-white">Reset Password</h2>
           <p className="text-xs text-gray-300">Set a new password for account: <strong className="text-[#D4AF37]">{email}</strong></p>
         </div>
+
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+            <span>{error}</span>
+          </div>
+        )}
 
         {done ? (
           <div className="text-center space-y-4 py-4">
@@ -51,6 +78,7 @@ export const ResetPassword: React.FC = () => {
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -66,6 +94,7 @@ export const ResetPassword: React.FC = () => {
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
@@ -76,9 +105,10 @@ export const ResetPassword: React.FC = () => {
 
             <button
               type="submit"
+              disabled={loading}
               className="w-full py-3 bg-[#D4AF37] text-[#0A2E24] font-bold text-xs uppercase rounded-xl hover:bg-[#E5C964]"
             >
-              Update Password
+              {loading ? 'Updating...' : 'Update Password'}
             </button>
           </form>
         )}

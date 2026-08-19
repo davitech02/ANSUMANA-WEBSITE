@@ -1,49 +1,39 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, ShieldCheck, Calendar, AlertCircle, FileCheck, CheckCircle2, Clock, Lock } from 'lucide-react';
-import { Permit, ReportSchedule } from '../types';
-import { getStorageData } from '../lib/storage';
+import { publicApi } from '../lib/api';
+import { PublicPermitLookup } from '../types';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
 
 export const CheckStatus: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searched, setSearched] = useState(false);
-  const [matchingPermits, setMatchingPermits] = useState<Permit[]>([]);
-  const [matchingSchedules, setMatchingSchedules] = useState<ReportSchedule[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [results, setResults] = useState<PublicPermitLookup[]>([]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchTerm.trim()) return;
 
-    const data = getStorageData();
-    const term = searchTerm.trim().toLowerCase();
-
-    // Search permits by permit_number or proponent_name or email match
-    const foundPermits = data.permits.filter((p) => {
-      const matchNumber = p.permit_number.toLowerCase().includes(term);
-      const matchName = p.proponent_name.toLowerCase().includes(term);
-      // find proponent email
-      const prop = data.proponents.find((pr) => pr.id === p.proponent_id);
-      const matchEmail = prop?.email.toLowerCase().includes(term);
-      return matchNumber || matchName || matchEmail;
-    });
-
-    const permitIds = foundPermits.map((p) => p.id);
-    const proponentIds = foundPermits.map((p) => p.proponent_id);
-
-    const foundSchedules = data.schedules.filter((s) => {
-      return (
-        (s.permit_id && permitIds.includes(s.permit_id)) ||
-        proponentIds.includes(s.proponent_id) ||
-        s.proponent_name.toLowerCase().includes(term)
-      );
-    });
-
-    setMatchingPermits(foundPermits);
-    setMatchingSchedules(foundSchedules);
-    setSearched(true);
+    setError('');
+    setLoading(true);
+    try {
+      const res = await publicApi.lookupPermitStatus(searchTerm.trim());
+      setResults(res.items);
+      setSearched(true);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getDaysRemaining = (expiryDateStr: string) => {
+  const getDaysRemaining = (expiryDateStr: string | null | undefined) => {
+    if (!expiryDateStr) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const exp = new Date(expiryDateStr);
@@ -78,6 +68,12 @@ export const CheckStatus: React.FC = () => {
       {/* SEARCH BAR CONTAINER */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-lg space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="w-5 h-5 text-gray-400 absolute left-3.5 top-3" />
@@ -92,9 +88,10 @@ export const CheckStatus: React.FC = () => {
             </div>
             <button
               type="submit"
-              className="px-6 py-2.5 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-heading font-bold text-xs sm:text-sm rounded-xl transition-colors shadow-md flex items-center justify-center gap-2"
+              disabled={loading}
+              className="px-6 py-2.5 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-heading font-bold text-xs sm:text-sm rounded-xl transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Search className="w-4 h-4" /> Check Status
+              <Search className="w-4 h-4" /> {loading ? 'Searching...' : 'Check Status'}
             </button>
           </form>
 
@@ -132,7 +129,11 @@ export const CheckStatus: React.FC = () => {
       {/* RESULTS DISPLAY */}
       {searched && (
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 animate-fadeIn">
-          {matchingPermits.length === 0 ? (
+          {loading ? (
+            <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center">
+              <p className="text-xs font-mono text-gray-600">Searching permit records...</p>
+            </div>
+          ) : results.length === 0 ? (
             <div className="bg-white p-8 rounded-2xl border border-gray-200 text-center space-y-4">
               <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
               <h3 className="font-heading font-bold text-xl text-[#0A2E24]">
@@ -153,17 +154,17 @@ export const CheckStatus: React.FC = () => {
           ) : (
             <div className="space-y-6">
               <h2 className="font-heading font-bold text-xl text-[#0A2E24] flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#D4AF37]" /> Verified EPA Permit Records ({matchingPermits.length})
+                <ShieldCheck className="w-5 h-5 text-[#D4AF37]" /> Verified EPA Permit Records ({results.length})
               </h2>
 
-              {matchingPermits.map((permit) => {
+              {results.map((permit, permitIdx) => {
                 const daysLeft = getDaysRemaining(permit.expiry_date);
-                const isExpired = daysLeft < 0;
-                const isWarning = daysLeft <= 30;
+                const isExpired = daysLeft !== null && daysLeft < 0;
+                const isWarning = daysLeft !== null && daysLeft <= 30;
 
                 return (
                   <div
-                    key={permit.id}
+                    key={`${permit.permit_number}-${permitIdx}`}
                     className="bg-white p-6 rounded-2xl border border-gray-200 shadow-md space-y-6 border-l-4 border-l-[#D4AF37]"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-gray-100">
@@ -199,7 +200,7 @@ export const CheckStatus: React.FC = () => {
 
                       <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
                         <span className="text-gray-500 font-mono text-[10px]">EXPIRY DATE</span>
-                        <p className="font-bold text-[#0A2E24] mt-0.5">{permit.expiry_date}</p>
+                        <p className="font-bold text-[#0A2E24] mt-0.5">{permit.expiry_date || 'No Expiry Date'}</p>
                       </div>
 
                       <div className="bg-gray-50 p-3 rounded-xl border border-gray-200">
@@ -213,7 +214,7 @@ export const CheckStatus: React.FC = () => {
                               : 'text-emerald-700'
                           }`}
                         >
-                          {isExpired ? 'Expired' : `${daysLeft} Days Remaining`}
+                          {daysLeft === null ? '—' : isExpired ? 'Expired' : `${daysLeft} Days Remaining`}
                         </p>
                       </div>
                     </div>
@@ -224,37 +225,37 @@ export const CheckStatus: React.FC = () => {
                         UPCOMING STATUTORY REPORT DEADLINES
                       </h4>
 
-                      {matchingSchedules.filter((s) => s.proponent_id === permit.proponent_id).length === 0 ? (
+                      {permit.schedules.length === 0 ? (
                         <p className="text-xs text-gray-500 italic">No pending report schedules found for this permit.</p>
                       ) : (
                         <div className="space-y-2">
-                          {matchingSchedules
-                            .filter((s) => s.proponent_id === permit.proponent_id)
-                            .map((sched) => (
-                              <div
-                                key={sched.id}
-                                className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                              >
-                                <div>
-                                  <p className="font-bold text-xs text-[#0A2E24]">{sched.report_type}</p>
-                                  <p className="text-[11px] text-gray-600">{sched.reporting_period}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs font-mono text-gray-700">
-                                    Due: <strong>{sched.due_date}</strong>
-                                  </span>
-                                  <span
-                                    className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                                      sched.status === 'Overdue'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-amber-100 text-amber-700'
-                                    }`}
-                                  >
-                                    {sched.status}
-                                  </span>
-                                </div>
+                          {permit.schedules.map((sched, schedIdx) => (
+                            <div
+                              key={`${permit.permit_number}-${schedIdx}`}
+                              className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                            >
+                              <div>
+                                <p className="font-bold text-xs text-[#0A2E24]">{sched.report_type}</p>
+                                <p className="text-[11px] text-gray-600">{sched.reporting_period}</p>
                               </div>
-                            ))}
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-gray-700">
+                                  Due: <strong>{sched.due_date}</strong>
+                                </span>
+                                <span
+                                  className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                    sched.status === 'Overdue'
+                                      ? 'bg-red-100 text-red-700'
+                                      : sched.status === 'Submitted' || sched.status === 'Completed'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }`}
+                                >
+                                  {sched.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>

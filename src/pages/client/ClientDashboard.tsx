@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileCheck,
@@ -15,35 +15,70 @@ import {
   Award,
   PhoneCall,
   Mail,
+  Loader2,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { useAuth } from '../../lib/AuthContext';
 import { useTheme } from '../../lib/ThemeContext';
-import { getStorageData } from '../../lib/storage';
+import { portalApi, saveDownload } from '../../lib/api';
 import { PermitStatusBadge, ComplianceStatusBadge } from '../../components/common/StatusBadges';
 import { ComplianceStatsWidget } from '../../components/common/ComplianceStatsWidget';
 import { ComplianceProgressChart } from '../../components/common/ComplianceProgressChart';
+import type { ClientEvidence, ClientFinding, ClientPermit, ReportSchedule } from '../../types';
+
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
 
 export const ClientDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { proponent } = useAuth();
   const { theme } = useTheme();
-  const [data, setData] = useState(() => getStorageData());
 
-  useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [clientPermits, setClientPermits] = useState<ClientPermit[]>([]);
+  const [clientSchedules, setClientSchedules] = useState<ReportSchedule[]>([]);
+  const [clientFindings, setClientFindings] = useState<ClientFinding[]>([]);
+  const [clientEvidence, setClientEvidence] = useState<ClientEvidence[]>([]);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [permits, schedules, findings, evidence] = await Promise.all([
+        portalApi.listClientPermits(),
+        portalApi.listClientSchedules(),
+        portalApi.listClientFindings(),
+        portalApi.listClientEvidence(),
+      ]);
+      setClientPermits(permits.items);
+      setClientSchedules(schedules.items);
+      setClientFindings(findings.items);
+      setClientEvidence(evidence.items);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Find client proponent
-  const proponent = data.proponents.find(
-    (p) => p.email.toLowerCase() === (user?.email || '').toLowerCase()
-  ) || data.proponents[0];
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  const clientPermits = data.permits.filter((p) => p.proponent_id === proponent?.id);
-  const clientSchedules = data.schedules.filter((s) => s.proponent_id === proponent?.id);
-  const clientFindings = data.findings.filter((f) => f.proponent_id === proponent?.id);
-  const clientEvidence = data.evidence.filter((e) => e.proponent_id === proponent?.id);
+  const handlePermitDownload = async (permitId: string) => {
+    setDownloadingId(permitId);
+    setDownloadError(null);
+    try {
+      await saveDownload(portalApi.clientPermitFileUrl(permitId));
+    } catch (e) {
+      setDownloadError(errMsg(e));
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   // Compute Stats
   const activePermitsCount = clientPermits.filter((p) => p.permit_status === 'Active').length;
@@ -83,31 +118,22 @@ export const ClientDashboard: React.FC = () => {
   };
 
   // Compliance Progress Tracker Data
+  const completedSchedules = clientSchedules.filter((s) => s.status === 'Completed').length;
+  const pendingSchedules = clientSchedules.filter(
+    (s) => s.status === 'Pending' || s.status === 'Submitted'
+  ).length;
+  const overdueSchedules = clientSchedules.filter((s) => s.status === 'Overdue').length;
+
   const complianceProgressData = [
     {
-      period: 'Reports',
-      completed: clientSchedules.filter((s) => s.status === 'Completed').length,
-      pending: clientSchedules.filter((s) => s.status === 'Pending').length,
-      overdue: clientSchedules.filter((s) => s.status === 'Overdue').length,
-    },
-    {
-      period: 'Findings',
-      completed: clientFindings.filter((f) => f.action_status === 'Verified').length,
-      pending: clientFindings.filter((f) => f.action_status !== 'Verified' && f.action_status !== 'Overdue').length,
-      overdue: clientFindings.filter((f) => f.action_status === 'Overdue').length,
-    },
-    {
-      period: 'Evidence',
-      completed: clientEvidence.filter((e) => e.review_status === 'Approved').length,
-      pending: clientEvidence.filter((e) => e.review_status === 'Pending review').length,
-      overdue: 0,
+      period: 'My Reports',
+      completed: completedSchedules,
+      pending: pendingSchedules,
+      overdue: overdueSchedules,
     },
   ];
-  const totalProgress = clientSchedules.length + clientFindings.length + clientEvidence.length;
-  const completedProgress =
-    clientSchedules.filter((s) => s.status === 'Completed').length +
-    clientFindings.filter((f) => f.action_status === 'Verified').length +
-    clientEvidence.filter((e) => e.review_status === 'Approved').length;
+  const totalProgress = completedSchedules + pendingSchedules + overdueSchedules;
+  const completedProgress = completedSchedules;
 
   return (
     <div className="space-y-8 font-sans">
@@ -144,190 +170,221 @@ export const ClientDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* High-Level Statutory Metrics Overview Widget */}
-      <ComplianceStatsWidget
-        totalActivePermits={clientPermits.filter((p) => p.permit_status === 'Active').length}
-        totalPendingRenewalPermits={clientPermits.filter((p) => p.permit_status === 'Pending Renewal').length}
-        totalExpiredPermits={clientPermits.filter((p) => p.permit_status === 'Expired').length}
-        upcomingDeadlines={clientSchedules.filter((s) => s.status === 'Pending').length}
-        overdueDeadlines={clientSchedules.filter((s) => s.status === 'Overdue').length}
-        pendingFindings={clientFindings.filter((f) => f.action_status === 'Open').length}
-        highRiskFindings={clientFindings.filter((f) => f.risk_level === 'High').length}
-        role="client"
-      />
-
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-emerald-600">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-emerald-800 font-bold uppercase">ACTIVE EPA PERMITS</span>
-            <FileCheck className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{activePermitsCount}</p>
-          <Link to="/portal/permits" className="text-[10px] text-emerald-700 font-bold hover:underline block mt-1">
-            View Permit Details →
-          </Link>
+      {loading ? (
+        <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-[#D4AF37] mx-auto" />
+          <p className="text-sm font-bold text-[#0A2E24]">Loading your compliance dashboard...</p>
+          <p className="text-xs text-gray-500">Fetching live permits, schedules, findings and evidence from AEC servers.</p>
         </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-red-500">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-red-600 font-bold uppercase">OVERDUE AUDITS</span>
-            <AlertTriangle className="w-4 h-4 text-red-500" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-red-600 mt-2">{overdueSchedulesCount}</p>
-          <Link to="/portal/schedules" className="text-[10px] text-red-600 font-bold hover:underline block mt-1">
-            View Schedule →
-          </Link>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#D4AF37]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-[#0A2E24] font-bold uppercase">OPEN FINDINGS</span>
-            <AlertTriangle className="w-4 h-4 text-[#D4AF37]" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{openFindingsCount}</p>
-          <Link to="/portal/findings" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
-            Submit Evidence →
-          </Link>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-blue-600 font-bold uppercase">SUBMITTED EVIDENCE</span>
-            <Upload className="w-4 h-4 text-blue-500" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-blue-600 mt-2">{pendingEvidenceCount}</p>
-          <Link to="/portal/evidence" className="text-[10px] text-blue-600 font-bold hover:underline block mt-1">
-            Evidence Queue →
-          </Link>
-        </div>
-      </div>
-
-      {/* Quick Action Buttons Bar */}
-      <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-xs font-mono font-bold text-[#0A2E24] uppercase">QUICK ACTIONS:</span>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            to="/portal/evidence"
-            className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+      ) : error ? (
+        <div className="bg-rose-50 p-8 rounded-2xl border border-rose-200 text-center space-y-3">
+          <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
+          <p className="text-sm font-bold text-rose-800">Unable to load dashboard data</p>
+          <p className="text-xs text-rose-600">{error}</p>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-[#0A2E24] text-[#D4AF37] font-bold text-xs rounded-xl hover:bg-[#1A4A3A] transition-colors"
           >
-            <Upload className="w-3.5 h-3.5" /> Upload Corrective Action Evidence
-          </Link>
-          <Link
-            to="/portal/book"
-            className="px-4 py-2 bg-[#D4AF37] hover:bg-[#E5C964] text-[#0A2E24] font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5"
-          >
-            <Calendar className="w-3.5 h-3.5" /> Book Technical Review Call
-          </Link>
+            Retry
+          </button>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* High-Level Statutory Metrics Overview Widget */}
+          <ComplianceStatsWidget
+            totalActivePermits={clientPermits.filter((p) => p.permit_status === 'Active').length}
+            totalPendingRenewalPermits={clientPermits.filter((p) => p.permit_status === 'Pending Renewal').length}
+            totalExpiredPermits={clientPermits.filter((p) => p.permit_status === 'Expired').length}
+            upcomingDeadlines={clientSchedules.filter((s) => s.status === 'Pending').length}
+            overdueDeadlines={clientSchedules.filter((s) => s.status === 'Overdue').length}
+            pendingFindings={clientFindings.filter((f) => f.action_status === 'Open').length}
+            highRiskFindings={clientFindings.filter((f) => f.risk_level === 'High').length}
+            role="client"
+          />
 
-      {/* Compliance Progress Tracker */}
-      <ComplianceProgressChart
-        title="My Compliance Progress Tracker"
-        subtitle="Completed vs pending vs overdue statutory requirements"
-        data={complianceProgressData}
-        total={totalProgress}
-        completedTotal={completedProgress}
-      />
-
-      {/* Visual Data Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Pie Chart: Compliance Breakdown */}
-        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-          <h3 className="font-heading font-bold text-base text-[#0A2E24]">
-            Audit Findings Compliance Breakdown
-          </h3>
-
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px', color: dark ? '#C6D6CE' : '#334155' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Bar Chart: Statutory Report Deadlines */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-          <h3 className="font-heading font-bold text-base text-[#0A2E24]">
-            Statutory Audit Submissions Progress
-          </h3>
-
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData}>
-                <XAxis dataKey="period" tick={{ fontSize: 11, fill: axisColor }} />
-                <YAxis tick={{ fontSize: 11, fill: axisColor }} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Legend wrapperStyle={{ fontSize: '11px', color: dark ? '#C6D6CE' : '#334155' }} />
-                <Bar dataKey="Completed" fill="#059669" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Pending" fill="#D97706" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Overdue" fill="#DC2626" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Active Permit Overview & Pending Deadlines Table */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-          <h3 className="font-heading font-bold text-base text-[#0A2E24]">
-            Active EPA Permits & Mining Licenses
-          </h3>
-          <Link to="/portal/permits" className="text-xs text-[#D4AF37] font-bold hover:underline">
-            View All Permits →
-          </Link>
-        </div>
-
-        <div className="space-y-3">
-          {clientPermits.length === 0 ? (
-            <p className="text-xs text-gray-500 italic">No permits registered under this proponent profile.</p>
-          ) : (
-            clientPermits.map((p) => (
-              <div
-                key={p.id}
-                className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-              >
-                <div>
-                  <span className="font-mono text-[10px] text-gray-500 font-bold uppercase">{p.permit_type}</span>
-                  <p className="font-heading font-bold text-[#0A2E24] text-sm">{p.permit_number}</p>
-                  <p className="text-gray-600 text-[11px]">Valid Until: {p.expiry_date}</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <PermitStatusBadge status={p.permit_status} />
-                  {p.permit_file_url && (
-                    <a
-                      href={p.permit_file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-1.5 bg-[#0A2E24] text-[#D4AF37] font-bold text-xs rounded-lg hover:bg-[#1A4A3A] flex items-center gap-1"
-                    >
-                      <Download className="w-3.5 h-3.5" /> PDF Certificate
-                    </a>
-                  )}
-                </div>
+          {/* Stat Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-emerald-600">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-emerald-800 font-bold uppercase">ACTIVE EPA PERMITS</span>
+                <FileCheck className="w-4 h-4 text-emerald-600" />
               </div>
-            ))
-          )}
-        </div>
-      </div>
+              <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{activePermitsCount}</p>
+              <Link to="/portal/permits" className="text-[10px] text-emerald-700 font-bold hover:underline block mt-1">
+                View Permit Details →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-red-500">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-red-600 font-bold uppercase">OVERDUE AUDITS</span>
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-red-600 mt-2">{overdueSchedulesCount}</p>
+              <Link to="/portal/schedules" className="text-[10px] text-red-600 font-bold hover:underline block mt-1">
+                View Schedule →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#D4AF37]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[#0A2E24] font-bold uppercase">OPEN FINDINGS</span>
+                <AlertTriangle className="w-4 h-4 text-[#D4AF37]" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{openFindingsCount}</p>
+              <Link to="/portal/findings" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
+                Submit Evidence →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-blue-600 font-bold uppercase">SUBMITTED EVIDENCE</span>
+                <Upload className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-blue-600 mt-2">{pendingEvidenceCount}</p>
+              <Link to="/portal/evidence" className="text-[10px] text-blue-600 font-bold hover:underline block mt-1">
+                Evidence Queue →
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons Bar */}
+          <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-mono font-bold text-[#0A2E24] uppercase">QUICK ACTIONS:</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                to="/portal/evidence"
+                className="px-4 py-2 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <Upload className="w-3.5 h-3.5" /> Upload Corrective Action Evidence
+              </Link>
+              <Link
+                to="/portal/book"
+                className="px-4 py-2 bg-[#D4AF37] hover:bg-[#E5C964] text-[#0A2E24] font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <Calendar className="w-3.5 h-3.5" /> Book Technical Review Call
+              </Link>
+            </div>
+          </div>
+
+          {/* Compliance Progress Tracker */}
+          <ComplianceProgressChart
+            title="My Compliance Progress Tracker"
+            subtitle="Completed vs pending vs overdue statutory requirements"
+            data={complianceProgressData}
+            total={totalProgress}
+            completedTotal={completedProgress}
+          />
+
+          {/* Visual Data Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Pie Chart: Compliance Breakdown */}
+            <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+              <h3 className="font-heading font-bold text-base text-[#0A2E24]">
+                Audit Findings Compliance Breakdown
+              </h3>
+
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '11px', color: dark ? '#C6D6CE' : '#334155' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Bar Chart: Statutory Report Deadlines */}
+            <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+              <h3 className="font-heading font-bold text-base text-[#0A2E24]">
+                Statutory Audit Submissions Progress
+              </h3>
+
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barData}>
+                    <XAxis dataKey="period" tick={{ fontSize: 11, fill: axisColor }} />
+                    <YAxis tick={{ fontSize: 11, fill: axisColor }} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px', color: dark ? '#C6D6CE' : '#334155' }} />
+                    <Bar dataKey="Completed" fill="#059669" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Pending" fill="#D97706" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Overdue" fill="#DC2626" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Permit Overview & Pending Deadlines Table */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h3 className="font-heading font-bold text-base text-[#0A2E24]">
+                Active EPA Permits & Mining Licenses
+              </h3>
+              <Link to="/portal/permits" className="text-xs text-[#D4AF37] font-bold hover:underline">
+                View All Permits →
+              </Link>
+            </div>
+
+            {downloadError && (
+              <p className="text-xs text-rose-600 font-bold">{downloadError}</p>
+            )}
+
+            <div className="space-y-3">
+              {clientPermits.length === 0 ? (
+                <p className="text-xs text-gray-500 italic">No permits registered under this proponent profile.</p>
+              ) : (
+                clientPermits.map((p) => (
+                  <div
+                    key={p.id}
+                    className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <span className="font-mono text-[10px] text-gray-500 font-bold uppercase">{p.permit_type}</span>
+                      <p className="font-heading font-bold text-[#0A2E24] text-sm">{p.permit_number}</p>
+                      <p className="text-gray-600 text-[11px]">Valid Until: {p.expiry_date}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <PermitStatusBadge status={p.permit_status} />
+                      {p.has_file ? (
+                        <button
+                          onClick={() => handlePermitDownload(p.id)}
+                          disabled={downloadingId === p.id}
+                          className="px-3 py-1.5 bg-[#0A2E24] text-[#D4AF37] font-bold text-xs rounded-lg hover:bg-[#1A4A3A] flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {downloadingId === p.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5" />
+                          )} PDF Certificate
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

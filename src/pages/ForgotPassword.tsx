@@ -1,14 +1,30 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { authApi } from '../lib/api';
 
 export const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSent(true);
+    setError('');
+    setLoading(true);
+    try {
+      await authApi.forgotPassword(email);
+      setSent(true);
+    } catch (err) {
+      setError(
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : 'Request failed. Please try again.',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -19,20 +35,22 @@ export const ForgotPassword: React.FC = () => {
           <p className="text-xs text-gray-300">Enter your registered company email to receive reset instructions.</p>
         </div>
 
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-300 text-xs rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {sent ? (
           <div className="text-center space-y-4 py-4">
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-[#D4AF37] flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             <p className="text-xs text-gray-200">
-              Reset link dispatched to <strong className="text-[#D4AF37]">{email}</strong>. Check your inbox or click below to simulate password reset.
+              If an account exists for <strong className="text-[#D4AF37]">{email}</strong>, a password
+              reset link has been sent. Check your inbox (valid for 30 minutes).
             </p>
-            <Link
-              to={`/reset-password?token=demo-token-123&email=${encodeURIComponent(email)}`}
-              className="inline-block py-2 px-4 bg-[#D4AF37] text-[#0A2E24] font-bold text-xs rounded-lg"
-            >
-              Open Reset Password Screen
-            </Link>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -45,7 +63,7 @@ export const ForgotPassword: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.sl"
+                  placeholder="name@company.lr"
                   className="w-full pl-9 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-[#D4AF37]"
                 />
               </div>
@@ -53,9 +71,10 @@ export const ForgotPassword: React.FC = () => {
 
             <button
               type="submit"
+              disabled={loading}
               className="w-full py-3 bg-[#D4AF37] text-[#0A2E24] font-bold text-xs uppercase rounded-xl hover:bg-[#E5C964]"
             >
-              Send Password Reset Link
+              {loading ? 'Sending...' : 'Send Password Reset Link'}
             </button>
           </form>
         )}

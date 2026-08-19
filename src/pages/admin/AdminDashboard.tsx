@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Building2,
@@ -8,122 +8,136 @@ import {
   Upload,
   MessageSquare,
   Download,
-  CheckCircle2,
   ShieldCheck,
   Send,
-  FileCheck,
   Activity,
-  Award,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Eye,
 } from 'lucide-react';
-import { getStorageData } from '../../lib/storage';
-import { exportToCSV } from '../../lib/exportUtils';
-import { sendEmailNotification } from '../../lib/notifications';
-import { PermitStatusBadge, ActionStatusBadge } from '../../components/common/StatusBadges';
+import { adminApi, workflowsApi } from '../../lib/api';
+import type {
+  Booking,
+  DashboardSummary,
+  DashboardTrends,
+  NotificationLog,
+  ReminderRunSummary,
+} from '../../types';
 import { ComplianceStatsWidget } from '../../components/common/ComplianceStatsWidget';
-import { DateRangeFilter, DateRange } from '../../components/common/DateRangeFilter';
 import { ComplianceProgressChart } from '../../components/common/ComplianceProgressChart';
 
-export const AdminDashboard: React.FC = () => {
-  const [data, setData] = useState(() => getStorageData());
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+function errMsg(e: unknown): string {
+  return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
+}
 
-  useEffect(() => {
-    const handleUpdate = () => setData(getStorageData());
-    window.addEventListener('aec_storage_updated', handleUpdate);
-    return () => window.removeEventListener('aec_storage_updated', handleUpdate);
+export const AdminDashboard: React.FC = () => {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [trends, setTrends] = useState<DashboardTrends | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [logs, setLogs] = useState<NotificationLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<'findings' | 'schedules' | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [reminderRunning, setReminderRunning] = useState(false);
+  const [dryRunRunning, setDryRunRunning] = useState(false);
+  const [reminderResult, setReminderResult] = useState<ReminderRunSummary | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [sum, trend, bookingRes, logRes] = await Promise.all([
+        workflowsApi.dashboardSummary(),
+        workflowsApi.dashboardTrends({ granularity: 'month' }),
+        adminApi.listBookings({ page: 1, per_page: 3 }),
+        workflowsApi.listNotificationLogs({ page: 1, per_page: 3 }),
+      ]);
+      setSummary(sum);
+      setTrends(trend);
+      setBookings(bookingRes.items);
+      setLogs(logRes.items);
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
   // Compute stat counts
-  const totalProponents = data.proponents.length;
-  const overdueReports = data.schedules.filter((s) => s.status === 'Overdue').length;
+  const totalProponents = summary?.proponents.total ?? 0;
+  const overdueReports = summary?.schedules.overdue ?? 0;
+  const due7Days = summary?.schedules.due_7 ?? 0;
+  const due14Days = summary?.schedules.due_14 ?? 0;
+  const due30Days = summary?.schedules.due_30 ?? 0;
+  const openFindings = summary?.findings.open ?? 0;
+  const pendingEvidence = summary?.evidence.pending_review ?? 0;
+  const newRequests = summary?.service_requests.new ?? 0;
 
-  const getDaysDiff = (dateStr: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const d = new Date(dateStr);
-    return Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  // Compliance Progress Chart data — from monthly trend buckets
+  const complianceProgressData = (trends?.buckets ?? []).map((b) => ({
+    period: b.period,
+    completed: b.completed,
+    pending: b.pending,
+    overdue: b.overdue,
+  }));
+  const totalProgress = (trends?.buckets ?? []).reduce((acc, b) => acc + b.total, 0);
+  const completedProgress = (trends?.buckets ?? []).reduce((acc, b) => acc + b.completed, 0);
+
+  const handleExportFindings = async () => {
+    setExporting('findings');
+    setExportError(null);
+    try {
+      await workflowsApi.downloadCsvExport('findings');
+    } catch (e) {
+      setExportError(errMsg(e));
+    } finally {
+      setExporting(null);
+    }
   };
 
-  const due7Days = data.schedules.filter((s) => {
-    const diff = getDaysDiff(s.due_date);
-    return diff >= 0 && diff <= 7 && s.status !== 'Completed';
-  }).length;
-
-  const due14Days = data.schedules.filter((s) => {
-    const diff = getDaysDiff(s.due_date);
-    return diff >= 0 && diff <= 14 && s.status !== 'Completed';
-  }).length;
-
-  const due30Days = data.schedules.filter((s) => {
-    const diff = getDaysDiff(s.due_date);
-    return diff >= 0 && diff <= 30 && s.status !== 'Completed';
-  }).length;
-
-  const openFindings = data.findings.filter((f) => f.action_status !== 'Verified').length;
-  const pendingEvidence = data.evidence.filter((e) => e.review_status === 'Pending review').length;
-  const newRequests = data.requests.filter((r) => r.status === 'New').length;
-
-  // Compliance Progress Chart data — grouped by proponent company
-  const complianceProgressData = data.proponents.map((prop) => {
-    const scheds = data.schedules.filter((s) => s.proponent_id === prop.id);
-    const complete = scheds.filter((s) => s.status === 'Completed').length;
-    const pending = scheds.filter((s) => s.status === 'Pending' || s.status === 'Submitted').length;
-    const overdue = scheds.filter((s) => s.status === 'Overdue').length;
-    return {
-      period: prop.company_name.split(' ')[0],
-      completed: complete,
-      pending,
-      overdue,
-    };
-  });
-  const totalProgress =
-    data.schedules.length + data.findings.length + data.evidence.length;
-  const completedProgress =
-    data.schedules.filter((s) => s.status === 'Completed').length +
-    data.findings.filter((f) => f.action_status === 'Verified').length +
-    data.evidence.filter((e) => e.review_status === 'Approved').length;
-
-  const handleExportData = () => {
-    // Export Findings CSV
-    exportToCSV('AEC_Compliance_Findings_Report', data.findings, [
-      { key: 'proponent_name', header: 'Proponent Name' },
-      { key: 'finding_title', header: 'Finding Title' },
-      { key: 'inspection_area', header: 'Inspection Area' },
-      { key: 'compliance_status', header: 'Compliance Status' },
-      { key: 'risk_level', header: 'Risk Level' },
-      { key: 'corrective_action', header: 'Corrective Action' },
-      { key: 'action_deadline', header: 'Action Deadline' },
-      { key: 'responsible_party', header: 'Responsible Party' },
-      { key: 'action_status', header: 'Action Status' },
-    ]);
-
-    // Export Schedules CSV
-    exportToCSV('AEC_Report_Schedules_Report', data.schedules, [
-      { key: 'proponent_name', header: 'Proponent Name' },
-      { key: 'report_type', header: 'Report Type' },
-      { key: 'reporting_period', header: 'Reporting Period' },
-      { key: 'due_date', header: 'Due Date' },
-      { key: 'status', header: 'Status' },
-    ]);
+  const handleExportSchedules = async () => {
+    setExporting('schedules');
+    setExportError(null);
+    try {
+      await workflowsApi.downloadCsvExport('schedules');
+    } catch (e) {
+      setExportError(errMsg(e));
+    } finally {
+      setExporting(null);
+    }
   };
 
-  const triggerManualReminder = (scheduleId: string) => {
-    const target = data.schedules.find((s) => s.id === scheduleId);
-    if (!target) return;
+  const handleRunReminders = async () => {
+    setReminderRunning(true);
+    setReminderError(null);
+    try {
+      const res = await workflowsApi.runReminders(false);
+      setReminderResult(res);
+    } catch (e) {
+      setReminderError(errMsg(e));
+    } finally {
+      setReminderRunning(false);
+    }
+  };
 
-    const proponent = data.proponents.find((p) => p.id === target.proponent_id);
-    const recipientEmail = proponent?.email || 'client@company.lr';
-
-    sendEmailNotification({
-      to: recipientEmail,
-      subject: `[AEC URGENT REMINDER] ${target.report_type} Due on ${target.due_date}`,
-      body: `Dear ${proponent?.contact_person || 'Proponent'}, this is an urgent reminder from Ansumana Environmental Consultancy Inc. Your ${target.report_type} for ${target.proponent_name} is due on ${target.due_date}. Please submit required documentation immediately.`,
-      notificationType: 'Report reminder',
-      proponentId: target.proponent_id,
-      reportScheduleId: target.id,
-    });
-
-    alert(`Manual Email & WhatsApp reminder dispatched to ${recipientEmail}`);
+  const handleDryRun = async () => {
+    setDryRunRunning(true);
+    setReminderError(null);
+    try {
+      const res = await workflowsApi.runReminders(true);
+      setReminderResult(res);
+    } catch (e) {
+      setReminderError(errMsg(e));
+    } finally {
+      setDryRunRunning(false);
+    }
   };
 
   return (
@@ -155,242 +169,286 @@ export const AdminDashboard: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
             <button
-              onClick={handleExportData}
-              className="px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#E5C964] text-[#0A2E24] font-heading font-bold text-xs rounded-xl shadow-md hover:from-[#E5C964] hover:to-[#D4AF37] transition-all flex items-center justify-center gap-2"
+              onClick={handleExportFindings}
+              disabled={exporting !== null}
+              className="px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#E5C964] text-[#0A2E24] font-heading font-bold text-xs rounded-xl shadow-md hover:from-[#E5C964] hover:to-[#D4AF37] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              <Download className="w-4 h-4" /> Export CSV Audit Reports
+              <Download className="w-4 h-4" />
+              {exporting === 'findings' ? 'Exporting...' : 'Export Findings CSV'}
+            </button>
+            <button
+              onClick={handleExportSchedules}
+              disabled={exporting !== null}
+              className="px-4 py-2.5 bg-gradient-to-r from-[#D4AF37] to-[#E5C964] text-[#0A2E24] font-heading font-bold text-xs rounded-xl shadow-md hover:from-[#E5C964] hover:to-[#D4AF37] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              {exporting === 'schedules' ? 'Exporting...' : 'Export Schedules CSV'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* High-Level Statutory Metrics Overview Widget */}
-      <ComplianceStatsWidget
-        totalActivePermits={data.permits.filter((p) => p.status === 'Active' || p.permit_status === 'Active').length}
-        totalPendingRenewalPermits={data.permits.filter((p) => p.status === 'Pending Renewal' || p.permit_status === 'Pending Renewal').length}
-        totalExpiredPermits={data.permits.filter((p) => p.status === 'Expired' || p.permit_status === 'Expired').length}
-        upcomingDeadlines={data.schedules.filter((s) => s.status === 'Upcoming' || s.status === 'Pending').length}
-        overdueDeadlines={data.schedules.filter((s) => s.status === 'Overdue').length}
-        pendingFindings={data.findings.filter((f) => f.status === 'Open' || f.action_status === 'Open' || f.compliance_status === 'Non-compliant').length}
-        highRiskFindings={data.findings.filter((f) => f.risk_level === 'High').length}
-        role="admin"
-      />
-
-      {/* 8 Stat Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#0A2E24]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-gray-500 font-bold uppercase">TOTAL PROPONENTS</span>
-            <Building2 className="w-4 h-4 text-[#0A2E24]" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{totalProponents}</p>
-          <Link to="/admin/proponents" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
-            Manage Proponents →
-          </Link>
+      {exportError && (
+        <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {exportError}
         </div>
+      )}
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-red-500">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-red-600 font-bold uppercase">OVERDUE REPORTS</span>
-            <AlertTriangle className="w-4 h-4 text-red-500" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-red-600 mt-2">{overdueReports}</p>
-          <Link to="/admin/schedules" className="text-[10px] text-red-600 font-bold hover:underline block mt-1">
-            View Overdue →
-          </Link>
+      {loading ? (
+        <div className="bg-white p-10 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-center gap-3">
+          <Loader2 className="w-5 h-5 text-[#D4AF37] animate-spin" />
+          <span className="text-xs font-bold text-gray-500">Loading dashboard data…</span>
         </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-amber-500">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-amber-700 font-bold uppercase">DUE IN 7 DAYS</span>
-            <Clock className="w-4 h-4 text-amber-500" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-amber-600 mt-2">{due7Days}</p>
-          <span className="text-[10px] text-gray-500 block mt-1">High priority</span>
+      ) : error ? (
+        <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {error}
         </div>
+      ) : (
+        <>
+          {/* High-Level Statutory Metrics Overview Widget */}
+          <ComplianceStatsWidget
+            totalActivePermits={summary?.permits.active ?? 0}
+            totalPendingRenewalPermits={summary?.permits.pending_renewal ?? 0}
+            totalExpiredPermits={summary?.permits.expired ?? 0}
+            upcomingDeadlines={summary?.schedules.pending ?? 0}
+            overdueDeadlines={summary?.schedules.overdue ?? 0}
+            pendingFindings={summary?.findings.open ?? 0}
+            highRiskFindings={summary?.findings.high_risk ?? 0}
+            role="admin"
+          />
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-yellow-500">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-yellow-700 font-bold uppercase">DUE IN 14 DAYS</span>
-            <Calendar className="w-4 h-4 text-yellow-600" />
+          {/* 8 Stat Cards Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#0A2E24]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-gray-500 font-bold uppercase">TOTAL PROPONENTS</span>
+                <Building2 className="w-4 h-4 text-[#0A2E24]" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{totalProponents}</p>
+              <Link to="/admin/proponents" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
+                Manage Proponents →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-red-500">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-red-600 font-bold uppercase">OVERDUE REPORTS</span>
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-red-600 mt-2">{overdueReports}</p>
+              <Link to="/admin/schedules" className="text-[10px] text-red-600 font-bold hover:underline block mt-1">
+                View Overdue →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-amber-500">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-amber-700 font-bold uppercase">DUE IN 7 DAYS</span>
+                <Clock className="w-4 h-4 text-amber-500" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-amber-600 mt-2">{due7Days}</p>
+              <span className="text-[10px] text-gray-500 block mt-1">High priority</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-yellow-500">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-yellow-700 font-bold uppercase">DUE IN 14 DAYS</span>
+                <Calendar className="w-4 h-4 text-yellow-600" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-yellow-600 mt-2">{due14Days}</p>
+              <span className="text-[10px] text-gray-500 block mt-1">Mid-range timeline</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-blue-600 font-bold uppercase">DUE IN 30 DAYS</span>
+                <Calendar className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-blue-600 mt-2">{due30Days}</p>
+              <span className="text-[10px] text-gray-500 block mt-1">Scheduled monitoring</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#D4AF37]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[#0A2E24] font-bold uppercase">OPEN FINDINGS</span>
+                <AlertTriangle className="w-4 h-4 text-[#D4AF37]" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{openFindings}</p>
+              <Link to="/admin/findings" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
+                Review Findings →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-emerald-600">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-emerald-800 font-bold uppercase">EVIDENCE QUEUE</span>
+                <Upload className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-emerald-700 mt-2">{pendingEvidence}</p>
+              <Link to="/admin/evidence" className="text-[10px] text-emerald-700 font-bold hover:underline block mt-1">
+                Inspect Evidence →
+              </Link>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-purple-600">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-purple-800 font-bold uppercase">NEW REQUESTS</span>
+                <MessageSquare className="w-4 h-4 text-purple-600" />
+              </div>
+              <p className="font-heading font-extrabold text-2xl text-purple-700 mt-2">{newRequests}</p>
+              <Link to="/admin/requests" className="text-[10px] text-purple-700 font-bold hover:underline block mt-1">
+                View Enquiries →
+              </Link>
+            </div>
           </div>
-          <p className="font-heading font-extrabold text-2xl text-yellow-600 mt-2">{due14Days}</p>
-          <span className="text-[10px] text-gray-500 block mt-1">Mid-range timeline</span>
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-blue-500">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-blue-600 font-bold uppercase">DUE IN 30 DAYS</span>
-            <Calendar className="w-4 h-4 text-blue-500" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-blue-600 mt-2">{due30Days}</p>
-          <span className="text-[10px] text-gray-500 block mt-1">Scheduled monitoring</span>
-        </div>
+          {/* Compliance Progress Tracker */}
+          <ComplianceProgressChart
+            title="Fleet-wide Compliance Progress Tracker"
+            subtitle="Completed vs pending vs overdue statutory requirements per period"
+            data={complianceProgressData}
+            total={totalProgress}
+            completedTotal={completedProgress}
+          />
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-[#D4AF37]">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-[#0A2E24] font-bold uppercase">OPEN FINDINGS</span>
-            <AlertTriangle className="w-4 h-4 text-[#D4AF37]" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{openFindings}</p>
-          <Link to="/admin/findings" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
-            Review Findings →
-          </Link>
-        </div>
+          {/* Main Panels Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Left Column: Reminder Engine */}
+            <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
+                  <Send className="w-4 h-4 text-[#D4AF37]" /> Reminder Engine
+                </h3>
+              </div>
+              <p className="text-[11px] text-gray-600">
+                Dispatch automated report reminders for pending and overdue statutory deadlines, or preview eligibility with a dry run.
+              </p>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-emerald-600">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-emerald-800 font-bold uppercase">EVIDENCE QUEUE</span>
-            <Upload className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-emerald-700 mt-2">{pendingEvidence}</p>
-          <Link to="/admin/evidence" className="text-[10px] text-emerald-700 font-bold hover:underline block mt-1">
-            Inspect Evidence →
-          </Link>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-t-4 border-t-purple-600">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-purple-800 font-bold uppercase">NEW REQUESTS</span>
-            <MessageSquare className="w-4 h-4 text-purple-600" />
-          </div>
-          <p className="font-heading font-extrabold text-2xl text-purple-700 mt-2">{newRequests}</p>
-          <Link to="/admin/requests" className="text-[10px] text-purple-700 font-bold hover:underline block mt-1">
-            View Enquiries →
-          </Link>
-        </div>
-      </div>
-
-      {/* Compliance Progress Tracker */}
-      <ComplianceProgressChart
-        title="Fleet-wide Compliance Progress Tracker"
-        subtitle="Completed vs pending vs overdue statutory requirements per proponent"
-        data={complianceProgressData}
-        total={totalProgress}
-        completedTotal={completedProgress}
-      />
-
-      {/* Main Panels Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Schedules Needing Action */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-            <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-[#D4AF37]" /> Urgent Statutory Report Deadlines
-            </h3>
-            <Link to="/admin/schedules" className="text-xs text-[#D4AF37] font-bold hover:underline">
-              View All Schedules →
-            </Link>
-          </div>
-
-          <DateRangeFilter onDateChange={(range) => setDateRange(range)} label="Filter Deadlines by Due Date Range" />
-
-          <div className="space-y-3">
-            {data.schedules
-              .filter((sched) => {
-                if (!dateRange) return true;
-                if (dateRange.startDate && sched.due_date < dateRange.startDate) return false;
-                if (dateRange.endDate && sched.due_date > dateRange.endDate) return false;
-                return true;
-              })
-              .slice(0, 5)
-              .map((sched) => {
-              const diff = getDaysDiff(sched.due_date);
-              const isOverdue = sched.status === 'Overdue' || diff < 0;
-
-              return (
-                <div
-                  key={sched.id}
-                  className="bg-gray-50 p-4 rounded-xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleRunReminders}
+                  disabled={reminderRunning || dryRunRunning}
+                  className="px-4 py-2.5 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] font-heading font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <div className="space-y-1">
-                    <p className="font-bold text-xs text-[#0A2E24]">{sched.proponent_name}</p>
-                    <p className="text-[11px] text-gray-600 font-medium">{sched.report_type} • {sched.reporting_period}</p>
-                    <p className="text-[10px] font-mono text-gray-500">Due Date: {sched.due_date}</p>
-                  </div>
+                  <RefreshCw className={`w-4 h-4 ${reminderRunning ? 'animate-spin' : ''}`} />
+                  {reminderRunning ? 'Running…' : 'Run Reminders'}
+                </button>
+                <button
+                  onClick={handleDryRun}
+                  disabled={reminderRunning || dryRunRunning}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-[#0A2E24] font-heading font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Eye className={`w-4 h-4 ${dryRunRunning ? 'animate-pulse' : ''}`} />
+                  {dryRunRunning ? 'Previewing…' : 'Dry Run Preview'}
+                </button>
+              </div>
 
-                  <div className="flex items-center gap-2">
+              {reminderError && (
+                <div className="bg-red-50 p-3 rounded-xl border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {reminderError}
+                </div>
+              )}
+
+              {reminderResult && (
+                <div className="bg-[#0A2E24] text-white p-4 rounded-xl border border-[#D4AF37]/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-heading font-bold text-sm">Reminder Run Summary</p>
                     <span
-                      className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold ${
-                        isOverdue
-                          ? 'bg-red-100 text-red-700 border border-red-300'
-                          : diff <= 14
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-blue-100 text-blue-800'
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                        reminderResult.dry_run ? 'bg-amber-400 text-amber-900' : 'bg-emerald-500 text-white'
                       }`}
                     >
-                      {isOverdue ? 'OVERDUE' : `${diff} DAYS REMAINING`}
-                    </span>
-
-                    <button
-                      onClick={() => triggerManualReminder(sched.id)}
-                      title="Send Manual Reminder"
-                      className="p-1.5 bg-[#0A2E24] hover:bg-[#1A4A3A] text-[#D4AF37] rounded-lg text-xs"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right Column: Recent Bookings & Notifications */}
-        <div className="lg:col-span-5 space-y-6">
-          {/* Recent Bookings */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#D4AF37]" /> Recent Consultation Bookings
-              </h3>
-              <Link to="/admin/bookings" className="text-xs text-[#D4AF37] font-bold hover:underline">
-                View All →
-              </Link>
-            </div>
-
-            <div className="space-y-3">
-              {data.bookings.slice(0, 3).map((book) => (
-                <div key={book.id} className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 space-y-1 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#0A2E24]">{book.full_name} ({book.company_name})</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold">
-                      {book.booking_status}
+                      {reminderResult.dry_run ? 'DRY RUN' : 'LIVE'}
                     </span>
                   </div>
-                  <p className="text-gray-600 text-[11px]">{book.service_needed}</p>
-                  <p className="text-gray-500 text-[10px] font-mono">{book.preferred_date} @ {book.preferred_time}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent Dispatched Alerts Log */}
-          <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-              <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#D4AF37]" /> Dispatched Reminder Engine Logs
-              </h3>
-              <Link to="/admin/logs" className="text-xs text-[#D4AF37] font-bold hover:underline">
-                View All Logs →
-              </Link>
-            </div>
-
-            <div className="space-y-2">
-              {data.logs.slice(0, 3).map((log) => (
-                <div key={log.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs space-y-1">
-                  <div className="flex justify-between items-center text-[10px] font-mono">
-                    <span className="text-[#0A2E24] font-bold">{log.channel} • {log.notification_type}</span>
-                    <span className="text-gray-500">{new Date(log.created_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                    <div>
+                      <p className="font-heading font-extrabold text-xl text-[#D4AF37]">{reminderResult.eligible}</p>
+                      <p className="text-[10px] text-gray-400 font-mono uppercase">Eligible</p>
+                    </div>
+                    <div>
+                      <p className="font-heading font-extrabold text-xl text-emerald-400">{reminderResult.sent}</p>
+                      <p className="text-[10px] text-gray-400 font-mono uppercase">Sent</p>
+                    </div>
+                    <div>
+                      <p className="font-heading font-extrabold text-xl text-red-400">{reminderResult.failed}</p>
+                      <p className="text-[10px] text-gray-400 font-mono uppercase">Failed</p>
+                    </div>
+                    <div>
+                      <p className="font-heading font-extrabold text-xl text-gray-200">{reminderResult.skipped}</p>
+                      <p className="text-[10px] text-gray-400 font-mono uppercase">Skipped</p>
+                    </div>
                   </div>
-                  <p className="text-gray-700 text-[11px] truncate">{log.subject}</p>
-                  <p className="text-gray-500 text-[10px] font-mono truncate">To: {log.recipient}</p>
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Right Column: Recent Bookings & Notifications */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Recent Bookings */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-[#D4AF37]" /> Recent Consultation Bookings
+                  </h3>
+                  <Link to="/admin/bookings" className="text-xs text-[#D4AF37] font-bold hover:underline">
+                    View All →
+                  </Link>
+                </div>
+
+                <div className="space-y-3">
+                  {bookings.length === 0 ? (
+                    <p className="text-[11px] text-gray-500 italic text-center py-4">No recent bookings.</p>
+                  ) : (
+                    bookings.map((book) => (
+                      <div key={book.id} className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 space-y-1 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-[#0A2E24]">{book.full_name} ({book.company_name || '—'})</span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold">
+                            {book.booking_status}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 text-[11px]">{book.service_needed}</p>
+                        <p className="text-gray-500 text-[10px] font-mono">{book.preferred_date} @ {book.preferred_time}</p>
+                        <p className="text-gray-400 text-[10px] font-mono">Created: {new Date(book.created_at).toLocaleString()}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Dispatched Alerts Log */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                  <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-[#D4AF37]" /> Dispatched Reminder Engine Logs
+                  </h3>
+                  <Link to="/admin/logs" className="text-xs text-[#D4AF37] font-bold hover:underline">
+                    View All Logs →
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  {logs.length === 0 ? (
+                    <p className="text-[11px] text-gray-500 italic text-center py-4">No notification logs yet.</p>
+                  ) : (
+                    logs.map((log) => (
+                      <div key={log.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs space-y-1">
+                        <div className="flex justify-between items-center text-[10px] font-mono">
+                          <span className="text-[#0A2E24] font-bold">{log.channel} • {log.notification_type}</span>
+                          <span className="text-gray-500">{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="text-gray-700 text-[11px] truncate">{log.subject || '—'}</p>
+                        <p className="text-gray-500 text-[10px] font-mono truncate">To: {log.recipient}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };
