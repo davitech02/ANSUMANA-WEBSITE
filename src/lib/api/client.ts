@@ -118,11 +118,11 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
   /** Path is appended to the API base URL (e.g. "/admin/permits"). */
 }
 
-function buildHeaders(hasBody: boolean): HeadersInit {
+function buildHeaders(contentType?: string): HeadersInit {
   const headers: Record<string, string> = { Accept: 'application/json' };
   const token = getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (hasBody) headers['Content-Type'] = 'application/json';
+  if (contentType) headers['Content-Type'] = contentType;
   return headers;
 }
 
@@ -141,20 +141,23 @@ async function parseErrorBody(response: Response): Promise<ApiErrorBody> {
 
 async function doRequest<T>(path: string, options: RequestOptions): Promise<T> {
   const hasBody = options.body !== undefined && options.body !== null;
+  const isFormData = options.body instanceof FormData;
+  const isJsonBody = hasBody && !isFormData && typeof options.body !== 'string';
   let bodyInit: BodyInit | null | undefined;
   if (hasBody) {
     bodyInit =
-      options.body instanceof FormData || typeof options.body === 'string'
+      isFormData || typeof options.body === 'string'
         ? (options.body as BodyInit)
         : JSON.stringify(options.body);
   }
+  const contentType = isJsonBody ? 'application/json' : undefined;
 
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       body: bodyInit as BodyInit,
-      headers: buildHeaders(hasBody),
+      headers: buildHeaders(contentType),
     });
   } catch {
     throw new ApiError(
@@ -171,7 +174,7 @@ async function doRequest<T>(path: string, options: RequestOptions): Promise<T> {
         response = await fetch(`${API_BASE_URL}${path}`, {
           ...options,
           body: bodyInit as BodyInit,
-          headers: buildHeaders(hasBody),
+          headers: buildHeaders(contentType),
         });
       } catch {
         throw new ApiError(

@@ -174,9 +174,7 @@ export const EXPORTABLE_ENTITIES = [
   'findings',
   'evidence',
   'bookings',
-  'service_requests',
-  'notification_logs',
-  'audit_logs',
+  'service-requests',
 ] as const;
 
 export type ExportEntity = (typeof EXPORTABLE_ENTITIES)[number];
