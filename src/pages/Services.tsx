@@ -21,6 +21,8 @@ export const Services: React.FC = () => {
     {
       id: 'audit',
       title: 'Environmental Audit Report',
+      bookingValue: 'Environmental audit planning session',
+      requestValue: 'Environmental Audit Report',
       icon: FileCheck,
       desc: 'Annual statutory environmental performance audit required by EPA Liberia for active industrial, commercial, and mining facilities.',
       whoNeeds: 'Operating gold mines, quarries, factories, cold stores, ports, and commercial complexes with existing EPA permits.',
@@ -34,6 +36,8 @@ export const Services: React.FC = () => {
     {
       id: 'biannual',
       title: 'Biannual Monitoring Report',
+      bookingValue: 'Biannual monitoring planning session',
+      requestValue: 'Biannual Monitoring Report',
       icon: Activity,
       desc: 'Mandatory 6-month compliance monitoring evaluation tracking environmental parameters and community safety measures.',
       whoNeeds: 'Large-scale infrastructure projects, mining concessions, timber harvesting operations, and hotel resorts.',
@@ -47,6 +51,8 @@ export const Services: React.FC = () => {
     {
       id: 'quarterly',
       title: 'Quarterly Monitoring Report',
+      bookingValue: 'Quarterly monitoring planning session',
+      requestValue: 'Quarterly Monitoring Report',
       icon: ClipboardList,
       desc: 'Detailed 3-month periodic compliance tracking for high-impact industrial or mining operations.',
       whoNeeds: 'Gold processing plants, chemical storage, industrial factories, and coastal dredging operations.',
@@ -60,6 +66,8 @@ export const Services: React.FC = () => {
     {
       id: 'esia',
       title: 'Environmental & Social Impact Assessment (ESIA)',
+      bookingValue: 'ESIA/EMP/EPB consultation',
+      requestValue: 'Environmental and Social Impact Assessment',
       icon: FileText,
       desc: 'Comprehensive multi-disciplinary baseline study evaluating physical, biological, and social impacts of proposed new developments.',
       whoNeeds: 'New mining concessions, road highways, power plants, large real estate projects, and marine ports.',
@@ -73,6 +81,8 @@ export const Services: React.FC = () => {
     {
       id: 'emp',
       title: 'Environmental Management Plan (EMP)',
+      bookingValue: 'ESIA/EMP/EPB consultation',
+      requestValue: 'Environmental Management Plan',
       icon: Compass,
       desc: 'Operational framework outlining concrete mitigation measures, monitoring schedules, emergency response protocols, and budgets.',
       whoNeeds: 'All proponents applying for or renewing an EPA Environmental Impact License.',
@@ -86,6 +96,8 @@ export const Services: React.FC = () => {
     {
       id: 'epb',
       title: 'Environmental Project Brief (EPB)',
+      bookingValue: 'ESIA/EMP/EPB consultation',
+      requestValue: 'Environmental Project Brief',
       icon: Layers,
       desc: 'Streamlined preliminary environmental assessment for medium or low-risk commercial developments.',
       whoNeeds: 'Cold storage warehouses, small quarry sites, eco-lodges, agricultural processing sheds, and petrol stations.',
@@ -99,6 +111,8 @@ export const Services: React.FC = () => {
     {
       id: 'mining',
       title: 'Mining License Support',
+      bookingValue: 'Mining license support session',
+      requestValue: 'Mining license support',
       icon: Pickaxe,
       desc: 'End-to-end regulatory environmental documentation for small-scale, large-scale, and artisanal mining license applications.',
       whoNeeds: 'Gold, diamond, bauxite, iron ore, and aggregate mining companies operating in Liberia.',
@@ -112,6 +126,8 @@ export const Services: React.FC = () => {
     {
       id: 'advisory',
       title: 'Compliance Advisory & Legal Defense Support',
+      bookingValue: 'Compliance review session',
+      requestValue: 'Compliance advisory',
       icon: ShieldAlert,
       desc: 'Retainer consulting for ongoing regulatory guidance, EPA notice responses, and environmental dispute resolution.',
       whoNeeds: 'Corporate entities facing EPA compliance notices, legal scrutiny, or expansion permitting.',
@@ -125,6 +141,8 @@ export const Services: React.FC = () => {
     {
       id: 'monitoring',
       title: 'Environmental Field Monitoring (Water, Air, Noise)',
+      bookingValue: 'Site visit planning call',
+      requestValue: 'Environmental monitoring',
       icon: Activity,
       desc: 'Certified scientific sampling and laboratory analysis using calibrated field testing instruments.',
       whoNeeds: 'Any facility requiring independent environmental laboratory proof of compliance.',
@@ -138,6 +156,8 @@ export const Services: React.FC = () => {
     {
       id: 'corrective',
       title: 'Corrective Action Tracking & Evidence Review',
+      bookingValue: 'Corrective action support session',
+      requestValue: 'Corrective action tracking',
       icon: Award,
       desc: 'Digital finding management and evidence verification system ensuring non-compliance issues are fixed rapidly.',
       whoNeeds: 'All AEC managed proponents seeking seamless audit verification and clean regulatory records.',
@@ -227,14 +247,14 @@ export const Services: React.FC = () => {
                 {/* CTAs */}
                 <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
                   <Link
-                    to={`/book?service=${encodeURIComponent(service.title)}`}
+                    to={`/book?service=${encodeURIComponent(service.bookingValue)}`}
                     className="flex-1 py-2.5 px-4 rounded-lg bg-[#D4AF37] hover:bg-[#E5C964] text-[#0A2E24] font-heading font-bold text-xs text-center transition-colors flex items-center justify-center gap-1.5 shadow-sm"
                   >
                     <PhoneCall className="w-3.5 h-3.5" /> Book a Session
                   </Link>
 
                   <Link
-                    to={`/contact?service=${encodeURIComponent(service.title)}`}
+                    to={`/contact?service=${encodeURIComponent(service.requestValue)}`}
                     className="flex-1 py-2.5 px-4 rounded-lg bg-[#0A2E24] hover:bg-[#1A4A3A] text-white font-heading font-bold text-xs text-center transition-colors flex items-center justify-center gap-1.5"
                   >
                     Request This Service <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />

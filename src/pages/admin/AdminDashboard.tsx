@@ -423,7 +423,7 @@ export const AdminDashboard: React.FC = () => {
                   <h3 className="font-heading font-bold text-base text-[#0A2E24] flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-[#D4AF37]" /> Dispatched Reminder Engine Logs
                   </h3>
-                  <Link to="/admin/logs" className="text-xs text-[#D4AF37] font-bold hover:underline">
+                  <Link to="/admin/email-logs" className="text-xs text-[#D4AF37] font-bold hover:underline">
                     View All Logs →
                   </Link>
                 </div>

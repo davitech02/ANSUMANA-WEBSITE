@@ -492,6 +492,7 @@ export const AdminFindings: React.FC = () => {
                     <option value="In progress">In progress</option>
                     <option value="Submitted for review">Submitted for review</option>
                     <option value="Verified">Verified & Closed</option>
+                    <option value="Overdue">Overdue</option>
                   </select>
                 </div>
               </div>

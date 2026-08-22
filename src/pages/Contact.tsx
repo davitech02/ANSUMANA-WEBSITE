@@ -4,6 +4,20 @@ import { MapPin, Phone, Mail, MessageSquare, Send, CheckCircle2, AlertCircle } f
 import { RequestService } from '../types';
 import { submitPublicServiceRequest } from '../lib/api/public';
 
+const VALID_REQUEST_SERVICES: RequestService[] = [
+  'Environmental Audit Report',
+  'Biannual Monitoring Report',
+  'Quarterly Monitoring Report',
+  'Environmental and Social Impact Assessment',
+  'Environmental Management Plan',
+  'Environmental Project Brief',
+  'Mining license support',
+  'Compliance advisory',
+  'Environmental monitoring',
+  'Corrective action tracking',
+  'Other',
+];
+
 export const Contact: React.FC = () => {
   const [searchParams] = useSearchParams();
   const preselectedService = searchParams.get('service') || '';
@@ -14,7 +28,9 @@ export const Contact: React.FC = () => {
     email: '',
     phone: '',
     whatsappNumber: '',
-    serviceNeeded: (preselectedService as RequestService) || 'Environmental Audit Report',
+    serviceNeeded: (VALID_REQUEST_SERVICES.includes(preselectedService as RequestService)
+      ? (preselectedService as RequestService)
+      : 'Environmental Audit Report') as RequestService,
     projectLocation: '',
     message: '',
   });
@@ -24,7 +40,7 @@ export const Contact: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (preselectedService) {
+    if (preselectedService && VALID_REQUEST_SERVICES.includes(preselectedService as RequestService)) {
       setFormData((prev) => ({ ...prev, serviceNeeded: preselectedService as RequestService }));
     }
   }, [preselectedService]);

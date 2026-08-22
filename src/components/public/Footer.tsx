@@ -137,8 +137,8 @@ export const Footer: React.FC = () => {
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-400 gap-4">
           <p>© {new Date().getFullYear()} Ansumana Environmental Consultancy Inc. All rights reserved.</p>
           <div className="flex items-center space-x-6">
-            <span className="hover:text-[#D4AF37] cursor-pointer">Privacy Policy</span>
-            <span className="hover:text-[#D4AF37] cursor-pointer">Terms of Service</span>
+            <span>Privacy Policy</span>
+            <span>Terms of Service</span>
             <Link to="/login" className="text-[#D4AF37] hover:underline">
               Portal Sign In
             </Link>

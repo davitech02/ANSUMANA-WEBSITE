@@ -190,7 +190,7 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
   }, [counts, role]);
 
   // Grouped Navigation Items matching reference image
-  const adminNavGroups = [
+  const adminNavGroups = useMemo(() => [
     {
       groupTitle: 'MENU',
       items: [
@@ -220,9 +220,9 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
         { name: 'Contact AEC', path: '/admin/contact', icon: PhoneCall },
       ],
     },
-  ];
+  ], [badges]);
 
-  const clientNavGroups = [
+  const clientNavGroups = useMemo(() => [
     {
       groupTitle: 'MENU',
       items: [
@@ -243,9 +243,9 @@ export const PortalLayout: React.FC<PortalLayoutProps> = () => {
         { name: 'Contact AEC', path: '/portal/contact', icon: PhoneCall },
       ],
     },
-  ];
+  ], [badges]);
 
-  const navGroups = role === 'admin' ? adminNavGroups : clientNavGroups;
+  const navGroups = useMemo(() => role === 'admin' ? adminNavGroups : clientNavGroups, [role, adminNavGroups, clientNavGroups]);
 
   // Mobile Bottom Navigation Bar Items (4 key links + Menu trigger)
   const mobileBottomNav = role === 'admin' ? [

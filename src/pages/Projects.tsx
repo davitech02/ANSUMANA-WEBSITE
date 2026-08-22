@@ -6,6 +6,7 @@ export const Projects: React.FC = () => {
   const categories = [
     {
       title: 'Mining & Quarry Projects',
+      bookingValue: 'Mining license support session',
       icon: Layers,
       count: '8 Concessions',
       image: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=800&q=80',
@@ -13,6 +14,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Gold Mining & Processing',
+      bookingValue: 'Mining license support session',
       icon: Pickaxe,
       count: '12 Active Sites',
       image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
@@ -20,6 +22,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Cold Storage & Logistics',
+      bookingValue: 'Site visit planning call',
       icon: Boxes,
       count: '6 Port Facilities',
       image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80',
@@ -27,6 +30,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Hotels & Eco-Resorts',
+      bookingValue: 'Compliance review session',
       icon: Hotel,
       count: '15 Locations',
       image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
@@ -34,6 +38,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Commercial Construction',
+      bookingValue: 'Site visit planning call',
       icon: Building2,
       count: '20+ Developments',
       image: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b7?auto=format&fit=crop&w=800&q=80',
@@ -41,6 +46,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Industrial Factories',
+      bookingValue: 'Compliance review session',
       icon: Factory,
       count: '9 Industrial Plants',
       image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80',
@@ -48,6 +54,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Sand Mining Operations',
+      bookingValue: 'Mining license support session',
       icon: Activity,
       count: '14 Riverbed Sites',
       image: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=800&q=80',
@@ -55,6 +62,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Port Warehouses',
+      bookingValue: 'Compliance review session',
       icon: Boxes,
       count: '10 Logistics Hubs',
       image: 'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=800&q=80',
@@ -62,6 +70,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Exploration Drilling',
+      bookingValue: 'Mining license support session',
       icon: Compass,
       count: '5 Prospecting Zones',
       image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
@@ -69,6 +78,7 @@ export const Projects: React.FC = () => {
     },
     {
       title: 'Sustainable Logging & Forestry',
+      bookingValue: 'Report planning session',
       icon: TreePine,
       count: '4 Timber Reserves',
       image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=800&q=80',
@@ -136,7 +146,7 @@ export const Projects: React.FC = () => {
 
                 <div className="p-6 pt-0 border-t border-gray-100 mt-auto">
                   <Link
-                    to={`/book?service=${encodeURIComponent(cat.title + ' Consultation')}`}
+                    to={`/book?service=${encodeURIComponent(cat.bookingValue)}`}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0A2E24] group-hover:text-[#D4AF37] transition-colors"
                   >
                     Discuss Your {cat.title} Project <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />

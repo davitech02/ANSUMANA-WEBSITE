@@ -55,9 +55,9 @@ export const AdminLogs: React.FC = () => {
     <div className="space-y-6 font-sans">
       <div className="pb-4 border-b border-gray-200">
         <h1 className="font-heading font-extrabold text-2xl text-[#0A2E24] flex items-center gap-2">
-          <History className="w-6 h-6 text-[#D4AF37]" /> Reminder Engine Audit Trail Logs
+          <History className="w-6 h-6 text-[#D4AF37]" /> System Audit Trail Logs
         </h1>
-        <p className="text-xs text-gray-600 mt-0.5">Audit log of all dispatched statutory report reminders, WhatsApp alerts, and booking confirmations</p>
+        <p className="text-xs text-gray-600 mt-0.5">Audit log of all administrative actions, status transitions, and compliance workflow events</p>
       </div>
 
       {error && (

@@ -15,14 +15,13 @@ export const CheckStatus: React.FC = () => {
   const [error, setError] = useState('');
   const [results, setResults] = useState<PublicPermitLookup[]>([]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) return;
-
+  const performLookup = async (term: string) => {
+    if (!term.trim()) return;
+    setSearchTerm(term.trim());
     setError('');
     setLoading(true);
     try {
-      const res = await publicApi.lookupPermitStatus(searchTerm.trim());
+      const res = await publicApi.lookupPermitStatus(term.trim());
       setResults(res.items);
       setSearched(true);
     } catch (e) {
@@ -30,6 +29,11 @@ export const CheckStatus: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performLookup(searchTerm);
   };
 
   const getDaysRemaining = (expiryDateStr: string | null | undefined) => {
@@ -100,7 +104,7 @@ export const CheckStatus: React.FC = () => {
             <span className="font-mono text-[10px] text-gray-400">TRY DEMO SEARCH:</span>
             <button
               onClick={() => {
-                setSearchTerm('EPA-LR-MIN-2025-089');
+                performLookup('EPA-LR-MIN-2025-089');
               }}
               className="px-2 py-1 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] font-mono text-[11px] rounded transition-colors"
             >
@@ -108,7 +112,7 @@ export const CheckStatus: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                setSearchTerm('compliance@liberiagold.lr');
+                performLookup('compliance@liberiagold.lr');
               }}
               className="px-2 py-1 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] font-mono text-[11px] rounded transition-colors"
             >
@@ -116,7 +120,7 @@ export const CheckStatus: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                setSearchTerm('EPA-LR-ML-2024-112');
+                performLookup('EPA-LR-ML-2024-112');
               }}
               className="px-2 py-1 bg-gray-100 hover:bg-[#D4AF37]/20 text-[#0A2E24] font-mono text-[11px] rounded transition-colors"
             >

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Video, Search, Loader2, AlertCircle, CheckCircle2, MessageCircle } from 'lucide-react';
-import { adminApi } from '../../lib/api';
+import { adminApi, workflowsApi } from '../../lib/api';
+import type { BookingWorkflowAction } from '../../lib/api/workflows';
 import type { Booking, BookingStatus, Pagination } from '../../types';
 
 function errMsg(e: unknown): string {
@@ -51,12 +52,33 @@ export const AdminBookings: React.FC = () => {
     load();
   }, [load]);
 
+  const WORKFLOW_BY_STATUS: Partial<Record<BookingStatus, BookingWorkflowAction>> = {
+    Confirmed: 'confirm',
+    Rescheduled: 'reschedule',
+    Completed: 'complete',
+    Cancelled: 'cancel',
+  };
+
+  const WORKFLOW_SOURCES: Record<BookingWorkflowAction, BookingStatus[]> = {
+    confirm: ['Pending', 'Rescheduled'],
+    reschedule: ['Pending', 'Confirmed'],
+    complete: ['Confirmed', 'Rescheduled'],
+    cancel: ['Pending', 'Confirmed', 'Rescheduled'],
+  };
+
   const handleUpdateStatus = async (id: string, booking_status: BookingStatus) => {
     setUpdatingId(id);
     setError(null);
     setSuccess(null);
     try {
-      await adminApi.updateBooking(id, { booking_status });
+      const current = bookings.find((b) => b.id === id)?.booking_status;
+      const action = WORKFLOW_BY_STATUS[booking_status];
+      const sources = action ? WORKFLOW_SOURCES[action] : null;
+      if (action && sources && current && sources.includes(current)) {
+        await workflowsApi.bookingWorkflow(id, action);
+      } else {
+        await adminApi.updateBooking(id, { booking_status });
+      }
       setSuccess('Booking status updated.');
       await load();
     } catch (e) {

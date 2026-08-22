@@ -17,6 +17,7 @@ export const ClientBook: React.FC = () => {
     service_needed: 'Environmental audit planning session' as BookingService,
     preferred_date: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
     preferred_time: '10:00 AM',
+    phone: proponent?.phone || user?.phone || '',
     message: '',
   });
 
@@ -33,7 +34,7 @@ export const ClientBook: React.FC = () => {
         full_name: user?.full_name || proponent?.contact_person || '',
         company_name: proponent?.company_name || '',
         email: user?.email || proponent?.email || '',
-        phone: proponent?.phone || '',
+        phone: form.phone,
         whatsapp_number: proponent?.whatsapp_number || undefined,
         service_needed: form.service_needed,
         preferred_date: form.preferred_date,
@@ -125,6 +126,18 @@ export const ClientBook: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <label className="block font-bold text-gray-700 mb-1">Phone / WhatsApp *</label>
+                <input
+                  type="tel"
+                  required
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="e.g. +231 770 000 000"
+                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+
+              <div>
                 <label className="block font-bold text-gray-700 mb-1">Preferred Date *</label>
                 <input
                   type="date"
@@ -134,8 +147,9 @@ export const ClientBook: React.FC = () => {
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-[#D4AF37]"
                 />
               </div>
+            </div>
 
-              <div>
+            <div>
                 <label className="block font-bold text-gray-700 mb-1">Preferred Time *</label>
                 <select
                   value={form.preferred_time}
@@ -148,7 +162,6 @@ export const ClientBook: React.FC = () => {
                   <option value="02:00 PM">02:00 PM GMT</option>
                   <option value="03:30 PM">03:30 PM GMT</option>
                 </select>
-              </div>
             </div>
 
             <div>

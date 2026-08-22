@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MessageSquare, Search, Loader2, AlertCircle, CheckCircle2, MessageCircle } from 'lucide-react';
-import { adminApi } from '../../lib/api';
+import { adminApi, workflowsApi } from '../../lib/api';
+import type { ServiceRequestWorkflowAction } from '../../lib/api/workflows';
 import type { ServiceRequest, RequestStatus, Pagination } from '../../types';
 
 function errMsg(e: unknown): string {
@@ -53,12 +54,41 @@ export const AdminRequests: React.FC = () => {
     load();
   }, [load]);
 
+  const WORKFLOW_BY_STATUS: Partial<Record<RequestStatus, ServiceRequestWorkflowAction>> = {
+    Contacted: 'contact',
+    'In Review': 'review',
+    'In progress': 'process',
+    Completed: 'complete',
+    Closed: 'close',
+    Archived: 'archive',
+  };
+
+  const WORKFLOW_SOURCES: Record<ServiceRequestWorkflowAction, RequestStatus[]> = {
+    contact: ['New'],
+    review: ['New', 'Contacted'],
+    process: ['New', 'Contacted', 'In Review'],
+    complete: ['Contacted', 'In Review', 'In progress'],
+    close: ['New', 'Contacted', 'In Review', 'In progress', 'Completed'],
+    reopen: ['Closed', 'Completed', 'Archived'],
+    archive: ['New', 'Contacted', 'In Review', 'In progress', 'Completed', 'Closed'],
+  };
+
   const handleUpdateStatus = async (id: string, status: RequestStatus) => {
     setUpdatingId(id);
     setError(null);
     setSuccess(null);
     try {
-      await adminApi.updateServiceRequest(id, { status });
+      const current = requests.find((r) => r.id === id)?.status;
+      let action = WORKFLOW_BY_STATUS[status];
+      if (!action && status === 'New' && current && ['Closed', 'Completed', 'Archived'].includes(current)) {
+        action = 'reopen';
+      }
+      const sources = action ? WORKFLOW_SOURCES[action] : null;
+      if (action && sources && current && sources.includes(current)) {
+        await workflowsApi.serviceRequestWorkflow(id, action);
+      } else {
+        await adminApi.updateServiceRequest(id, { status });
+      }
       setSuccess('Service request status updated.');
       await load();
     } catch (e) {

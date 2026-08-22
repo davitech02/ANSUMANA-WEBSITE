@@ -4,6 +4,19 @@ import { Calendar, Clock, MapPin, Send, CheckCircle2, ShieldCheck } from 'lucide
 import { publicApi } from '../lib/api';
 import { BookingService } from '../types';
 
+const VALID_BOOKING_SERVICES: BookingService[] = [
+  'Free consultation call',
+  'Environmental audit planning session',
+  'Biannual monitoring planning session',
+  'Quarterly monitoring planning session',
+  'ESIA/EMP/EPB consultation',
+  'Mining license support session',
+  'Compliance review session',
+  'Report planning session',
+  'Site visit planning call',
+  'Corrective action support session',
+];
+
 function errMsg(e: unknown): string {
   return e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Request failed. Please try again.';
 }
@@ -20,7 +33,9 @@ export const BookSession: React.FC = () => {
     email: '',
     phone: '',
     whatsappNumber: '',
-    serviceNeeded: (preselectedService as BookingService) || 'Free consultation call',
+    serviceNeeded: (VALID_BOOKING_SERVICES.includes(preselectedService as BookingService)
+      ? (preselectedService as BookingService)
+      : 'Free consultation call') as BookingService,
     preferredDate: '',
     preferredTime: '10:00 AM',
     projectLocation: '',
@@ -39,7 +54,9 @@ export const BookSession: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       preferredDate: dateStr,
-      serviceNeeded: preselectedService ? (preselectedService as BookingService) : prev.serviceNeeded,
+      serviceNeeded: preselectedService && VALID_BOOKING_SERVICES.includes(preselectedService as BookingService)
+        ? (preselectedService as BookingService)
+        : prev.serviceNeeded,
     }));
   }, [preselectedService]);
 

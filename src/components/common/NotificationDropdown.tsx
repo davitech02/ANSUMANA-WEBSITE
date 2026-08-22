@@ -144,6 +144,20 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ role
             );
 
           bookings.items
+            .filter((b) => b.booking_status === 'Pending')
+            .forEach((b) =>
+              items.push({
+                id: `n-book-pend-${b.id}`,
+                title: 'New booking awaiting confirmation',
+                description: `${b.company_name || b.full_name || ''} — ${b.service_needed}`,
+                time: b.created_at,
+                icon: Calendar,
+                path: '/admin/bookings',
+                tone: 'amber',
+              }),
+            );
+
+          bookings.items
             .filter((b) => b.booking_status === 'Confirmed')
             .forEach((b) =>
               items.push({
@@ -178,7 +192,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ role
               description: l.subject || '',
               time: l.created_at,
               icon: MessageSquare,
-              path: '/admin/logs',
+              path: l.channel === 'WhatsApp' ? '/admin/whatsapp-logs' : '/admin/email-logs',
               tone: 'gray',
             }),
           );

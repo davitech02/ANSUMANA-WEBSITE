@@ -233,7 +233,7 @@ export const ClientDashboard: React.FC = () => {
               </div>
               <p className="font-heading font-extrabold text-2xl text-[#0A2E24] mt-2">{openFindingsCount}</p>
               <Link to="/portal/findings" className="text-[10px] text-[#D4AF37] font-bold hover:underline block mt-1">
-                Submit Evidence →
+                View Findings →
               </Link>
             </div>
 
