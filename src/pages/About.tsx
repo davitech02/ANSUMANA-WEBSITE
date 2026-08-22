@@ -40,10 +40,12 @@ export const About: React.FC = () => {
             About Ansumana Environmental Consultancy Inc.
           </span>
           <h1 className="font-heading font-extrabold text-3xl sm:text-5xl text-white">
-            Pioneering Environmental Compliance in Liberia
+            Regulatory Compliance In Liberia
           </h1>
           <p className="text-gray-300 text-sm sm:text-base max-w-3xl mx-auto leading-relaxed">
-            Founded with a vision to bridge industrial development and ecological conservation, AEC provides accredited environmental consulting, EPA licensing, and digital compliance tracking for proponents nationwide.
+            Ansumana Environmental Consultancy Inc. was founded to address the growing need for practical, professional environmental and Mining consulting services in Liberia. We have been operational for over 12 years, and we understand the challenges businesses face in obtaining mining licenses and complying with Mining and Environmental regulations.
+
+            We help our clients achieve and maintain regulatory compliance by applying our professional judgment, local knowledge, and international standards, and by delivering solutions that enable effective operations throughout the project life cycle. Today, we're proud to be a trusted partner for businesses across multiple sectors, providing audits, impact assessments, monitoring reports, and training that support regulatory compliance and genuine environmental stewardship.
           </p>
         </div>
       </section>
@@ -57,7 +59,7 @@ export const About: React.FC = () => {
             </div>
             <h3 className="font-heading font-bold text-xl text-[#0A2E24]">Our Mission</h3>
             <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-              To empower commercial proponents and industrial operators across Liberia with rigorous, transparent, and actionable environmental compliance solutions. We ensure smooth regulatory approvals while safeguarding local air, water, and soil ecosystems.
+              To provide accessible, practical consulting services that help Liberian businesses operate responsibly and meet regulatory requirements.
             </p>
           </div>
 
@@ -82,10 +84,10 @@ export const About: React.FC = () => {
                 Proven Track Record
               </span>
               <h2 className="font-heading font-extrabold text-2xl sm:text-4xl text-[#0A2E24]">
-                Deep Institutional & Regulatory Expertise
+                Our Compliance Approach
               </h2>
               <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-                AEC maintains direct technical familiarity with Liberia Environmental Protection Agency Act regulations, mining codes, forestry laws, and international IFC Performance Standards.
+                AEC maintains direct technical familiarity with Liberia Environmental Protection and Management Law, Mineral and Mining Law, forestry laws, and international IFC Performance Standards.
               </p>
 
               <div className="space-y-3 pt-2">
@@ -93,14 +95,14 @@ export const About: React.FC = () => {
                   <CheckCircle2 className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />
                   <div>
                     <h4 className="font-bold text-sm text-[#0A2E24]">Accredited EPA Lead Environmental Consultants</h4>
-                    <p className="text-xs text-gray-600">Authorized to submit EIA, ESIA, and EPB reports directly to the EPA Board.</p>
+                    <p className="text-xs text-gray-600">Authorized to submit environmental reports directly to the EPA and Mines and Energy.</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-[#D4AF37] shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-bold text-sm text-[#0A2E24]">Field Equipment & Certified Laboratories</h4>
+                    <h4 className="font-bold text-sm text-[#0A2E24]">Partnership with Certified Laboratories and other Industry Experts</h4>
                     <p className="text-xs text-gray-600">Equipped for water turbidity, heavy metal testing, particulate PM10 dust, and acoustic noise sampling.</p>
                   </div>
                 </div>
@@ -150,11 +152,8 @@ export const About: React.FC = () => {
             Leadership Team
           </span>
           <h2 className="font-heading font-extrabold text-2xl sm:text-4xl text-[#0A2E24]">
-            Expert Consultants Behind AEC
+            Meet Our Management
           </h2>
-          <p className="text-gray-600 text-sm">
-            Our multi-disciplinary team brings senior environmental engineering, hydro-geology, legal advisory, and field GIS experience.
-          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -183,7 +182,7 @@ export const About: React.FC = () => {
       {/* CTA */}
       <section className="bg-[#0A2E24] text-white py-12 text-center">
         <div className="max-w-4xl mx-auto px-4 space-y-4">
-          <h2 className="font-heading font-bold text-2xl sm:text-3xl">Partner with Liberia’s Premier Compliance Team</h2>
+          <h2 className="font-heading font-bold text-2xl sm:text-3xl">Partner with AEC’s Team</h2>
           <p className="text-gray-300 text-sm">Speak with our environmental specialists to arrange a site evaluation or report planning session.</p>
           <div className="pt-2">
             <Link

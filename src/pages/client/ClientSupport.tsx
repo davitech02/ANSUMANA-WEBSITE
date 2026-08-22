@@ -79,12 +79,12 @@ export const ClientSupport: React.FC = () => {
           <h3 className="font-heading font-bold text-sm text-[#0A2E24]">WhatsApp Direct Line</h3>
           <p className="text-xs text-gray-500">Send photos of field site conditions or document drafts.</p>
           <a
-            href="https://wa.me/2310775301445"
+            href="https://wa.me/231771111540"
             target="_blank"
             rel="noreferrer"
             className="inline-block text-xs font-mono font-bold text-emerald-700 hover:underline"
           >
-            +231 077 530 1445
+            +231771111540
           </a>
         </div>
 

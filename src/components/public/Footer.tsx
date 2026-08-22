@@ -114,7 +114,7 @@ export const Footer: React.FC = () => {
               </li>
               <li className="flex items-center gap-3">
                 <MessageSquare className="w-4 h-4 text-[#D4AF37] shrink-0" />
-                <span>WhatsApp: +231 077 530 1445</span>
+                <span>WhatsApp: +231771111540</span>
               </li>
               <li className="flex items-center gap-3">
                 <Mail className="w-4 h-4 text-[#D4AF37] shrink-0" />

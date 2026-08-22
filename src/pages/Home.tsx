@@ -33,7 +33,7 @@ export const Home: React.FC = () => {
     },
     {
       title: 'Biannual & Quarterly Monitoring',
-      desc: 'Regular field sampling of water, air, noise, and effluent discharge with digital reporting.',
+      desc: 'Regular Environmental monitoring to track adherence to the conditions of the issued EPA Permit and identify emerging issues.',
       icon: Activity,
       link: '/services#monitoring',
     },
@@ -99,14 +99,11 @@ export const Home: React.FC = () => {
               </div>
 
               <h1 className="font-heading font-extrabold text-3xl sm:text-5xl lg:text-6xl text-white tracking-tight leading-tight">
-                Precision Stewardship for a{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#E5C964] to-[#D4AF37]">
-                  Sustainable Future
-                </span>
+                Environmental and Mining Compliance within Liberia
               </h1>
 
               <p className="text-gray-300 text-base sm:text-lg leading-relaxed max-w-2xl">
-                Liberia’s premier environmental compliance advisory. We partner with project proponents to secure EPA environmental permits, conduct biannual monitoring audits, manage corrective findings, and guarantee environmental compliance.
+                We're an EPA-Liberia accredited firm located in Paynesville, working directly with mining, construction, manufacturing, hospitality, cold storage, and Funeral home operators across the country to secure Environmental Permits, meet monitoring obligations, and stay ahead of regulatory audits. For mining clients, our support ranges from locating a viable claim to completing the full permit acquisition process.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -162,7 +159,7 @@ export const Home: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-gray-300 my-4 leading-relaxed">
-                  Already a project proponent in Liberia? Check your EPA permit expiry and upcoming report submission schedule instantly.
+                  Are you a Client of AEC? If yes, check your EPA permit expiry and upcoming report submission schedule instantly
                 </p>
 
                 <div className="space-y-3">
@@ -205,7 +202,7 @@ export const Home: React.FC = () => {
               Core Technical Offerings
             </span>
             <h2 className="font-heading font-extrabold text-2xl sm:text-4xl text-[#0A2E24]">
-              Liberia EPA Compliance Services
+              Environmental and Mining Compliance Services
             </h2>
             <p className="text-gray-600 text-sm sm:text-base">
               End-to-end environmental consulting designed to keep your business operating in full compliance with EPA standards and national legislation.

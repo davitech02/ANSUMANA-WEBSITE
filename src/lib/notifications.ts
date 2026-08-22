@@ -1,6 +1,6 @@
 export const AEC_ADMIN_EMAIL = 'info@ansumana.com';
 export const AEC_ADMIN_PHONE = '+231 088 125 2254';
-export const AEC_ADMIN_WHATSAPP = '+231 077 530 1445';
+export const AEC_ADMIN_WHATSAPP = '+231771111540';
 export const AEC_PHONE_MAIN = AEC_ADMIN_PHONE;
 export const AEC_WHATSAPP_MAIN = AEC_ADMIN_WHATSAPP;
 

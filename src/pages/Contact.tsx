@@ -142,9 +142,9 @@ export const Contact: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-[#0A2E24]">WhatsApp Business</h4>
-                  <p className="text-xs text-gray-600 mt-0.5">+231 077 530 1445</p>
+                  <p className="text-xs text-gray-600 mt-0.5">+231771111540</p>
                   <a
-                    href="https://wa.me/2310775301445"
+                    href="https://wa.me/231771111540"
                     target="_blank"
                     rel="noreferrer"
                     className="inline-block mt-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded transition-colors"
