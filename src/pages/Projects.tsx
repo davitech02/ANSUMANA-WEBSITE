@@ -17,7 +17,7 @@ export const Projects: React.FC = () => {
       bookingValue: 'Mining license support session',
       icon: Pickaxe,
       count: '12 Active Sites',
-      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1787614537753-d3af1a172357?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       desc: 'Artisanal and medium-scale open pit gold mining operations with tailings dam monitoring, cyanide safety protocols, and river siltation audits.',
     },
     {
@@ -41,7 +41,7 @@ export const Projects: React.FC = () => {
       bookingValue: 'Site visit planning call',
       icon: Building2,
       count: '20+ Developments',
-      image: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b7?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1787614537789-3f16d6d10807?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       desc: 'Multi-story office towers, shopping malls, housing estates, and road infrastructure projects across Monrovia, Paynesville, and Buchanan.',
     },
     {
@@ -49,7 +49,7 @@ export const Projects: React.FC = () => {
       bookingValue: 'Compliance review session',
       icon: Factory,
       count: '9 Industrial Plants',
-      image: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1787614537846-c1031b99c748?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       desc: 'Beverage bottling plants, cement grinding mills, plastic manufacturing, and food processing plants with stack gas & effluent monitoring.',
     },
     {
@@ -57,7 +57,7 @@ export const Projects: React.FC = () => {
       bookingValue: 'Mining license support session',
       icon: Activity,
       count: '14 Riverbed Sites',
-      image: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1787614537804-90597218ba39?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       desc: 'Organized riverbed sand dredging and coastal sand extraction operations regulated under EPA environmental project briefs.',
     },
     {
@@ -73,7 +73,7 @@ export const Projects: React.FC = () => {
       bookingValue: 'Mining license support session',
       icon: Compass,
       count: '5 Prospecting Zones',
-      image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1787614537860-37ddc0d434aa?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       desc: 'Mineral exploration concessions conducting core drilling, trenching, and environmental baseline studies in Nimba & Grand Bassa Counties.',
     },
     {
@@ -81,7 +81,7 @@ export const Projects: React.FC = () => {
       bookingValue: 'Report planning session',
       icon: TreePine,
       count: '4 Timber Reserves',
-      image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1787614538200-6a2e59e0a90f?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
       desc: 'Forestry concessions with timber harvesting management plans, reforestation commitments, and biodiversity conservation zones.',
     },
   ];
@@ -94,7 +94,7 @@ export const Projects: React.FC = () => {
           className="absolute inset-0 bg-cover bg-center opacity-20"
           style={{
             backgroundImage:
-              'url("https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=2000&q=80")',
+              'url("https://images.unsplash.com/photo-1787614537846-c1031b99c748?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D")',
           }}
         />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center space-y-4">
