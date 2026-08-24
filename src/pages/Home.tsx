@@ -82,7 +82,7 @@ export const Home: React.FC = () => {
           className="absolute inset-0 bg-cover bg-center scale-105 transition-transform duration-1000"
           style={{
             backgroundImage:
-              'url("https://images.unsplash.com/photo-1571223641822-b82408a0e705?auto=format&fit=crop&w=2000&q=80")',
+              'url("https://images.unsplash.com/photo-1787614537753-d3af1a172357?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D")',
           }}
         />
         <div className="absolute inset-0 bg-[#0A2E24]/40 md:bg-[#0A2E24]/20" />
