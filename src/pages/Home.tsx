@@ -56,8 +56,8 @@ export const Home: React.FC = () => {
     'Full-Cycle Environmental Permit Acquisition & Renewal Management',
     'Real-Time Compliance Tracking & Automatic 30/14/7-Day Reminder Engine',
     'Digital Corrective Action & Photo/Document Evidence Verification',
-    'Multi-Sector Field Experience: Gold Mining, Aggregates, Ports, Industry & Eco-Resorts',
-    'Dedicated Compliance Specialists in Monrovia, Paynesville, Buchanan & Gbarnga',
+    'Multi-Sector Field Experience',
+    'Dedicated Compliance Specialists in Liberia',
   ];
 
   const sectors = [
@@ -373,7 +373,7 @@ export const Home: React.FC = () => {
                 />
               </div>
               <div className="absolute -bottom-6 -right-6 w-64 p-6 bg-[#0A2E24] text-white rounded-2xl shadow-xl z-20 border border-[#D4AF37]">
-                <p className="font-heading font-bold text-2xl text-[#D4AF37]">15+ Years</p>
+                <p className="font-heading font-bold text-2xl text-[#D4AF37]">12+ Years</p>
                 <p className="text-xs text-gray-300">Combined Environmental Engineering Leadership in West Africa</p>
               </div>
             </div>
@@ -386,7 +386,7 @@ export const Home: React.FC = () => {
                 Trusted Partner for Regulatory Approval in Liberia
               </h2>
               <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-                Navigating Environmental Protection Agency (EPA) Liberia regulations requires deep local expertise, rigorous sampling methodologies, and clear documentation. AEC delivers uncompromising quality.
+                AEC helps businesses, mining companies, mining cooperatives, and development projects meet the regulatory requirements of the Environmental Protection Agency (EPA) of Liberia and the Ministry of Mines and Energy (MME). Our team combines local regulatory knowledge, field experience, environmental sampling, clear reporting, and digital compliance tracking to help your project stay organized, responsive, and prepared for regulatory review.
               </p>
 
               <div className="space-y-3 pt-2">
@@ -459,7 +459,7 @@ export const Home: React.FC = () => {
             Get Compliant Today
           </span>
           <h2 className="font-heading font-extrabold text-3xl sm:text-5xl text-white">
-            Need an Environmental Audit or EPA Permit Renewal?
+            Need an Environmental or Mining Service?
           </h2>
           <p className="text-gray-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
             Speak directly with AEC senior environmental advisors. Book a planning call or request an official proposal today.

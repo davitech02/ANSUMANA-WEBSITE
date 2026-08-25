@@ -21,151 +21,171 @@ export const Services: React.FC = () => {
     {
       id: 'audit',
       title: 'Environmental Audit Report',
+      subTitle: 'EPA Liberia Compliance Service',
       bookingValue: 'Environmental audit planning session',
       requestValue: 'Environmental Audit Report',
       icon: FileCheck,
-      desc: 'Annual statutory environmental performance audit required by EPA Liberia for active industrial, commercial, and mining facilities.',
-      whoNeeds: 'Operating gold mines, quarries, factories, cold stores, ports, and commercial complexes with existing EPA permits.',
+      desc: 'A detailed assessment of an operating facility or project to determine its level of compliance with environmental permit conditions, approved management measures, and applicable EPA requirements.',
+      whoNeeds: 'Operating mines, quarries, factories, cold stores, hotels, petroleum facilities, ports, construction projects, and other EPA-permitted operations requiring an environmental compliance review or permit renewal.',
       aecSupport: [
-        'On-site field inspections and discharge sampling',
-        'Verification of Environmental Management Plan compliance',
-        'Formal reporting and EPA Liberia board submission',
-        'Issuance of official audit compliance endorsement',
+        'On-site environmental inspection and operational assessment',
+        'Review of EPA permit conditions, EMP/ESMP commitments, and environmental records',
+        'Environmental sampling coordination where applicable',
+        'Compliance gap assessment and corrective action plan',
+        'Complete Environmental Audit Report and EPA submission support',
       ],
     },
     {
       id: 'biannual',
       title: 'Biannual Monitoring Report',
+      subTitle: 'EPA Environmental Compliance Reporting',
       bookingValue: 'Biannual monitoring planning session',
       requestValue: 'Biannual Monitoring Report',
       icon: Activity,
-      desc: 'Mandatory 6-month compliance monitoring evaluation tracking environmental parameters and community safety measures.',
-      whoNeeds: 'Large-scale infrastructure projects, mining concessions, timber harvesting operations, and hotel resorts.',
+      desc: 'A six-month environmental performance report that documents how a project is implementing its environmental management measures and complying with its EPA permit conditions.',
+      whoNeeds: 'EPA-permitted facilities and projects whose permit conditions or reporting schedule require environmental monitoring every six months.',
       aecSupport: [
-        'Biannual surface/groundwater laboratory testing',
-        'Air particulate PM10 & ambient acoustic noise measurement',
-        'Socio-economic community stakeholder interviews',
-        'Compilation and upload to AEC compliance portal',
+        'Six-month site inspection and environmental performance review',
+        'Assessment of EMP/ESMP implementation',
+        'Review of waste, safety, environmental, and operational records',
+        'Environmental monitoring and laboratory data review',
+        'Complete Biannual Monitoring Report for EPA submission',
       ],
     },
     {
       id: 'quarterly',
       title: 'Quarterly Monitoring Report',
+      subTitle: 'EPA Periodic Compliance Monitoring',
       bookingValue: 'Quarterly monitoring planning session',
       requestValue: 'Quarterly Monitoring Report',
       icon: ClipboardList,
-      desc: 'Detailed 3-month periodic compliance tracking for high-impact industrial or mining operations.',
-      whoNeeds: 'Gold processing plants, chemical storage, industrial factories, and coastal dredging operations.',
+      desc: 'A three-month environmental monitoring report used to document operational conditions, environmental performance, permit compliance, and implementation of required mitigation measures.',
+      whoNeeds: 'Mining operations, industrial facilities, construction projects, and other permit holders required by their EPA permit or regulatory conditions to report quarterly.',
       aecSupport: [
-        'Effluent water quality and heavy metal screening',
-        'Hazardous waste disposal manifest audits',
-        'Quarterly site findings and corrective action logs',
-        'Direct EPA submission and compliance verification',
+        'Quarterly environmental site inspection',
+        'Compliance assessment against permit and EMP/ESMP requirements',
+        'Review of environmental incidents, waste management, and corrective actions',
+        'Environmental sampling and monitoring results, where applicable',
+        'Complete Quarterly Monitoring Report for regulatory submission',
       ],
     },
     {
       id: 'esia',
       title: 'Environmental & Social Impact Assessment (ESIA)',
+      subTitle: 'Pre-Development Environmental Assessment',
       bookingValue: 'ESIA/EMP/EPB consultation',
       requestValue: 'Environmental and Social Impact Assessment',
       icon: FileText,
-      desc: 'Comprehensive multi-disciplinary baseline study evaluating physical, biological, and social impacts of proposed new developments.',
-      whoNeeds: 'New mining concessions, road highways, power plants, large real estate projects, and marine ports.',
+      desc: 'A comprehensive environmental and social study for proposed projects that may cause significant environmental or social impacts and require detailed assessment before development begins.',
+      whoNeeds: 'Large mining projects, industrial developments, major infrastructure, energy projects, large agricultural developments, ports, processing facilities, and other projects screened by the EPA for a full ESIA.',
       aecSupport: [
-        'Baseline ecological, hydrological, and soil surveys',
-        'Public consultation workshops and stakeholder mapping',
-        'Impact mitigation modeling and risk matrices',
-        'EPA Public Hearing representation & approval support',
+        'Project screening, scoping, and baseline environmental studies',
+        'Environmental and social field assessments',
+        'Stakeholder and community consultations',
+        'Impact identification, mitigation measures, and alternatives analysis',
+        'ESMP development and complete ESIA documentation for EPA review',
       ],
     },
     {
       id: 'emp',
       title: 'Environmental Management Plan (EMP)',
+      subTitle: 'Environmental Management & Mitigation Planning',
       bookingValue: 'ESIA/EMP/EPB consultation',
       requestValue: 'Environmental Management Plan',
       icon: Compass,
-      desc: 'Operational framework outlining concrete mitigation measures, monitoring schedules, emergency response protocols, and budgets.',
-      whoNeeds: 'All proponents applying for or renewing an EPA Environmental Impact License.',
+      desc: 'A practical management document that identifies project impacts and sets out the measures, responsibilities, monitoring requirements, and resources needed to manage them.',
+      whoNeeds: 'New or existing businesses, industrial facilities, mining operations, construction projects, hotels, cold storage facilities, petroleum facilities, and other developments that require an environmental management framework.',
       aecSupport: [
-        'Customized mitigation matrices and responsible party matrices',
-        'Waste management & spill containment protocols',
-        'Mine site closure & land reclamation roadmaps',
-        'Staff environmental health and safety (HSE) manual',
+        'Identification of environmental and social risks',
+        'Project-specific mitigation and management measures',
+        'Environmental monitoring indicators and responsibilities',
+        'Waste, pollution, health, safety, and emergency management measures',
+        'Implementation schedule and compliance monitoring framework',
       ],
     },
     {
       id: 'epb',
       title: 'Environmental Project Brief (EPB)',
+      subTitle: 'EPA Project Screening & Permitting Support',
       bookingValue: 'ESIA/EMP/EPB consultation',
       requestValue: 'Environmental Project Brief',
       icon: Layers,
-      desc: 'Streamlined preliminary environmental assessment for medium or low-risk commercial developments.',
-      whoNeeds: 'Cold storage warehouses, small quarry sites, eco-lodges, agricultural processing sheds, and petrol stations.',
+      desc: 'An Environmental Project Brief provides the EPA with key information on a proposed project, its location, activities, potential impacts, baseline conditions, and planned environmental management measures.',
+      whoNeeds: 'Developers and businesses establishing new projects or expanding existing operations that have been directed through the EPA screening process to prepare an Environmental Project Brief.',
       aecSupport: [
-        'Rapid site screening and baseline characterization',
-        'Identification of key environmental triggers',
-        'Preparation and submission of standard EPB dossier',
-        'Expedited EPA environmental permit processing',
+        'Project description and site assessment',
+        'Environmental and social baseline assessment',
+        'Stakeholder consultation and supporting documentation',
+        'Impact assessment and mitigation measures',
+        'Environmental Management Plan and complete EPB submission package',
       ],
     },
     {
       id: 'mining',
       title: 'Mining License Support',
+      subTitle: 'Ministry of Mines & Energy Regulatory Support',
       bookingValue: 'Mining license support session',
       requestValue: 'Mining license support',
       icon: Pickaxe,
-      desc: 'End-to-end regulatory environmental documentation for small-scale, large-scale, and artisanal mining license applications.',
-      whoNeeds: 'Gold, diamond, bauxite, iron ore, and aggregate mining companies operating in Liberia.',
+      desc: 'AEC assists mining companies, cooperatives, and investors with the environmental, technical, mapping, and documentation requirements that support applications to the Ministry of Mines and Energy and the EPA.',
+      whoNeeds: 'Mining cooperatives, Class C miners, companies pursuing Class B or Class A mining licenses, quarry operators, and investors preparing to enter Liberia\'s mining sector.',
       aecSupport: [
-        'National Minerals Agency (NMA) & EPA license alignment',
-        'Mine tailings dam safety and water catchment design review',
-        'Community Development Agreement (CDA) environmental inputs',
-        'Permit renewal schedule management in AEC portal',
+        'Mining license application documentation support',
+        'Site coordinates, GIS maps, and production-area documentation',
+        'Work plan and environmental documentation support',
+        'EPA environmental permitting coordination',
+        'Compliance follow-up with applicable mining and environmental requirements',
       ],
     },
     {
       id: 'advisory',
       title: 'Compliance Advisory & Legal Defense Support',
+      subTitle: 'Regulatory & Technical Compliance Support',
       bookingValue: 'Compliance review session',
       requestValue: 'Compliance advisory',
       icon: ShieldAlert,
-      desc: 'Retainer consulting for ongoing regulatory guidance, EPA notice responses, and environmental dispute resolution.',
-      whoNeeds: 'Corporate entities facing EPA compliance notices, legal scrutiny, or expansion permitting.',
+      desc: 'AEC provides environmental technical support to businesses responding to EPA inspections, compliance notices, environmental complaints, enforcement matters, and other regulatory concerns.',
+      whoNeeds: 'Companies facing EPA inspections, notices of violation, environmental complaints, permit disputes, compliance investigations, penalties, or regulatory proceedings.',
       aecSupport: [
-        'Direct representation during EPA site inspections',
-        'Drafting official response letters and corrective commitments',
-        'Regulatory gap analysis and risk mitigation',
-        'Corporate ESG & international compliance alignment',
+        'Technical review of inspection findings and alleged non-compliance',
+        'Environmental records and evidence assessment',
+        'Corrective action and compliance response preparation',
+        'Technical reports and supporting environmental evidence',
+        'Environmental technical support to management and licensed legal counsel during regulatory matters',
       ],
     },
     {
       id: 'monitoring',
       title: 'Environmental Field Monitoring (Water, Air, Noise)',
+      subTitle: 'Water • Air • Noise • Soil Monitoring',
       bookingValue: 'Site visit planning call',
       requestValue: 'Environmental monitoring',
       icon: Activity,
-      desc: 'Certified scientific sampling and laboratory analysis using calibrated field testing instruments.',
-      whoNeeds: 'Any facility requiring independent environmental laboratory proof of compliance.',
+      desc: 'AEC coordinates environmental field monitoring with qualified analytical laboratories to provide reliable environmental data for permitting, audits, monitoring reports, baseline studies, and compliance assessments.',
+      whoNeeds: 'Mining companies, factories, petroleum facilities, construction projects, hotels, cold stores, processing plants, agricultural operations, and other facilities requiring environmental monitoring data.',
       aecSupport: [
-        'In-situ pH, turbidity, dissolved oxygen, and heavy metal testing',
-        'Sound level acoustic decibel monitoring',
-        'Dust deposition and gas emission screening',
-        'Chain-of-custody laboratory certificates',
+        'Surface water, groundwater, and wastewater sampling',
+        'Ambient air quality and emission monitoring coordination',
+        'Environmental and occupational noise monitoring',
+        'Soil and sediment sampling',
+        'Laboratory analysis coordination, results interpretation, and integration into environmental reports',
       ],
     },
     {
       id: 'corrective',
       title: 'Corrective Action Tracking & Evidence Review',
+      subTitle: 'Post-Inspection Compliance Management',
       bookingValue: 'Corrective action support session',
       requestValue: 'Corrective action tracking',
       icon: Award,
-      desc: 'Digital finding management and evidence verification system ensuring non-compliance issues are fixed rapidly.',
-      whoNeeds: 'All AEC managed proponents seeking seamless audit verification and clean regulatory records.',
+      desc: 'AEC helps clients document, track, and close environmental findings identified during audits, EPA inspections, monitoring exercises, internal reviews, or other compliance assessments.',
+      whoNeeds: 'Companies with outstanding EPA observations, audit findings, permit conditions, inspection findings, environmental incidents, or corrective actions requiring documented closure.',
       aecSupport: [
-        'Detailed finding classification (Compliant, Observation, Minor, Major)',
-        'Deadline setting and responsible party assignments',
+        'Corrective action register and compliance tracking',
+        'Review of photographs, receipts, records, laboratory results, and other evidence',
         'Evidence photo & document review by AEC lead engineer',
-        'Official verification certificate issuance',
+        'Preparation of close-out evidence and regulatory response documentation',
+        'Verification of completed environmental corrective measures',
       ],
     },
   ];
@@ -188,9 +208,9 @@ export const Services: React.FC = () => {
           <h1 className="font-heading font-extrabold text-3xl sm:text-5xl text-white">
             Comprehensive Environmental Services
           </h1>
-          <p className="text-gray-300 text-sm sm:text-base max-w-3xl mx-auto leading-relaxed">
+          {/* <p className="text-gray-300 text-sm sm:text-base max-w-3xl mx-auto leading-relaxed">
             From initial Environmental Impact Assessments to annual statutory EPA audits and real-time digital monitoring, explore our full spectrum of specialized consulting offerings in Liberia.
-          </p>
+          </p> */}
         </div>
       </section>
 
@@ -215,7 +235,7 @@ export const Services: React.FC = () => {
                         {service.title}
                       </h3>
                       <span className="text-[10px] font-mono text-[#2A6A52] bg-[#1A4A3A]/10 px-2 py-0.5 rounded font-semibold">
-                        EPA Liberia Compliant
+                        {service.subTitle}
                       </span>
                     </div>
                   </div>
@@ -269,7 +289,7 @@ export const Services: React.FC = () => {
       {/* FINAL CONSULTATION BANNER */}
       <section className="bg-[#0A2E24] text-white py-12 text-center">
         <div className="max-w-4xl mx-auto px-4 space-y-4">
-          <h2 className="font-heading font-bold text-2xl sm:text-3xl">Not Sure Which Permit or Assessment You Need?</h2>
+          <h2 className="font-heading font-bold text-2xl sm:text-3xl">Not Sure Which Service You Need?</h2>
           <p className="text-gray-300 text-sm">Our EPA advisory specialists will review your project parameters and map out your regulatory compliance roadmap.</p>
           <div className="pt-2">
             <Link

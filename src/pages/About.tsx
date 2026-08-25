@@ -122,12 +122,12 @@ export const About: React.FC = () => {
                 <div className="bg-[#0A2E24] text-white p-6 rounded-2xl shadow-md border border-[#D4AF37]/30">
                   <p className="font-heading font-extrabold text-3xl text-[#D4AF37]">85+</p>
                   <p className="text-xs text-gray-300 font-mono mt-1">PROPONENTS SERVED</p>
-                  <p className="text-[11px] text-gray-400 mt-2">Across Montserrado, Nimba, Grand Bassa & Margibi Counties</p>
+                  <p className="text-[11px] text-gray-400 mt-2">Across Liberia</p>
                 </div>
                 <div className="bg-[#1A4A3A] text-white p-6 rounded-2xl shadow-md border border-[#D4AF37]/30">
                   <p className="font-heading font-extrabold text-3xl text-white">120+</p>
                   <p className="text-xs text-[#D4AF37] font-mono mt-1">REPORTS FILED</p>
-                  <p className="text-[11px] text-gray-300 mt-2">EPA Audits, Biannual & Quarterly Reports</p>
+                  <p className="text-[11px] text-gray-300 mt-2">EPA Audits, Biannual & Quarterly Reports, Technical Workplan and Budget, Annual Audits, RAPs, EMPs</p>
                 </div>
                 <div className="bg-[#1A4A3A] text-white p-6 rounded-2xl shadow-md border border-[#D4AF37]/30">
                   <p className="font-heading font-extrabold text-3xl text-white">100%</p>

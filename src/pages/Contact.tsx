@@ -91,7 +91,7 @@ export const Contact: React.FC = () => {
             Contact AEC & Request Service
           </h1>
           <p className="text-gray-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-            Have questions regarding EPA environmental permit regulations or need an official proposal for an environmental audit? Fill out the form below or reach our Paynesville team directly.
+            Have questions about EPA environmental permit regulations or Mining Licenses, or need an official proposal for an environmental service? Fill out the form below or contact our team directly.
           </p>
         </div>
       </section>
@@ -262,7 +262,7 @@ export const Contact: React.FC = () => {
                         type="tel"
                         value={formData.whatsappNumber}
                         onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
-                        placeholder="+231 077 000 000"
+                        placeholder="“+231771111540"
                         className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 focus:outline-none focus:border-[#D4AF37]"
                       />
                     </div>

@@ -105,7 +105,7 @@ export const BookSession: React.FC = () => {
             Book a Technical Consultation
           </h1>
           <p className="text-gray-300 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
-            Schedule a planning call or in-person session with senior AEC environmental consultants to discuss EPA permit requirements, monitoring schedules, and audit preparation.
+            Schedule a planning call or in-person session with senior AEC environmental consultants to discuss what mining or environmental services you need.
           </p>
         </div>
       </section>
