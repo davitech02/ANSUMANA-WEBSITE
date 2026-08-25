@@ -155,6 +155,23 @@ export const Services: React.FC = () => {
       ],
     },
     {
+      id: 'advisory',
+      title: 'Resettlement Action Plans – RAPs',
+      subTitle: 'Social Safeguards & Resettlement Planning',
+      bookingValue: 'Resettlement Action Plans ',
+      requestValue: 'Resettlement Action Plans – RAPs',
+      icon: ShieldAlert,
+      desc: 'A Resettlement Action Plan establishes how a project will manage land acquisition, displacement, livelihood impacts, compensation, relocation, and engagement with project-affected persons.',
+      whoNeeds: 'Mining, infrastructure, energy, road, industrial, agricultural, and other projects that may cause physical displacement, economic displacement, loss of assets, or restrictions on access to land and resources.',
+      aecSupport: [
+        'Identification and assessment of project-affected persons',
+        'Socio-economic surveys and asset inventory support',
+        'Stakeholder consultation and grievance planning',
+        'Compensation, livelihood restoration, and resettlement planning',
+        'RAP implementation and monitoring framework',
+      ],
+    },
+    {
       id: 'monitoring',
       title: 'Environmental Field Monitoring (Water, Air, Noise)',
       subTitle: 'Water • Air • Noise • Soil Monitoring',
