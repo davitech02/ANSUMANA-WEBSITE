@@ -270,3 +270,14 @@ def get_config(env: str | None = None) -> type[Config]:
             f"Expected one of: {', '.join(sorted(config_by_name))}"
         )
     return config_by_name[env]
+
+
+def normalize_database_url(url: str) -> str:
+    """Normalise legacy ``postgres://`` scheme to ``postgresql://``.
+
+    Render and some other PaaS providers still emit the deprecated
+    ``postgres://`` scheme.  SQLAlchemy 2.0+ requires ``postgresql://``.
+    """
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url

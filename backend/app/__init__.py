@@ -8,7 +8,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from .cli import register_commands
-from .config import ProductionConfig, get_config
+from .config import ProductionConfig, get_config, normalize_database_url
 from .extensions import db, jwt, limiter, ma, mail, migrate
 from .observability import init_observability
 from .routes import register_blueprints
@@ -30,6 +30,12 @@ def create_app(config_override: str | None = None) -> Flask:
     config_cls = get_config(config_override)
     app = Flask(__name__)
     app.config.from_object(config_cls)
+
+    # Normalise legacy ``postgres://`` → ``postgresql://`` for SQLAlchemy 2.0+.
+    # Render and some other PaaS providers still emit the deprecated scheme.
+    app.config["SQLALCHEMY_DATABASE_URI"] = normalize_database_url(
+        app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    )
 
     if config_cls is ProductionConfig:
         ProductionConfig.validate()

@@ -694,3 +694,45 @@ def test_diagnostics_never_leaks_secrets(client, data):
 def test_migration_head_matches_alembic(app):
     with app.app_context():
         assert health_service.migration_head() == CURRENT_MIGRATION_HEAD
+
+
+# --------------------------------------------------------------------------- #
+# DATABASE_URL scheme normalization
+# --------------------------------------------------------------------------- #
+
+def test_database_url_postgres_scheme_normalized():
+    """Render injects ``postgres://``; normalise to ``postgresql://``."""
+    from app.config import normalize_database_url
+    assert normalize_database_url("postgres://user:pass@db.internal:5432/aec") == (
+        "postgresql://user:pass@db.internal:5432/aec"
+    )
+
+
+def test_database_url_postgresql_scheme_unchanged():
+    """A correctly-schemed URL must pass through unmodified."""
+    from app.config import normalize_database_url
+    assert normalize_database_url("postgresql://user:pass@db.internal:5432/aec") == (
+        "postgresql://user:pass@db.internal:5432/aec"
+    )
+
+
+def test_database_url_empty_unchanged():
+    """An empty DATABASE_URL stays empty."""
+    from app.config import normalize_database_url
+    assert normalize_database_url("") == ""
+
+
+def test_database_url_sqlite_unchanged():
+    """SQLite URLs are not affected by the normalisation."""
+    from app.config import normalize_database_url
+    assert normalize_database_url("sqlite:///:memory:") == "sqlite:///:memory:"
+
+
+def test_create_app_normalizes_database_url(app):
+    """create_app applies the scheme normalizer to SQLALCHEMY_DATABASE_URI."""
+    app.config["SQLALCHEMY_DATABASE_URI"] = "postgres://user:pass@db:5432/aec"
+    from app import create_app as _create_app
+    from app.config import normalize_database_url
+    assert normalize_database_url(app.config["SQLALCHEMY_DATABASE_URI"]) == (
+        "postgresql://user:pass@db:5432/aec"
+    )
