@@ -8,13 +8,13 @@ export const About: React.FC = () => {
       name: 'Mr. Charles S. Dagoseh Sr.',
       role: 'CEO- Ansumana Environmental Consultancy Inc. Mining Engineer | Rock Mechanics Specialist | EPA-Accredited Environmental Consultant',
       bio: 'A Mining Engineer, Rock Mechanics Specialist, and Environmental Consultant with over 22 years of practical and professional experience in the mining, environmental, and natural resources sectors.He earned his Bachelor of Science degree from the University of Liberia in 1980 and obtained professional training and certification from the Colorado School of Mines, USA, in 1979.',
-      image: 'https://images.unsplash.com/photo-1788119884904-fa4d260c8eb8?q=80&w=1365&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      image: 'https://images.unsplash.com/photo-1788121167108-c02cad584864?q=80&w=3234&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     },
     {
       name: 'Charles S. Dagoseh Jr.',
       role: 'General Manager Environmental Consultant | ESIA Evaluator, BBA In Management | M.Sc. Candidate in Environmental Science',
       bio: 'A Certified Environmental Consultant and ESIA Evaluator with 8 years of practical experience in environmental assessment, environmental auditing, compliance monitoring, environmental management planning, field inspections, regulatory reporting, and environmental permitting support.',
-      image: 'https://images.unsplash.com/photo-1788120435131-cf0cf714d23c?q=80&w=2244&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      image: 'https://images.unsplash.com/photo-1788121081777-0898b62b5251?q=80&w=2244&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     },
     {
       name: 'CLLR. URIAS S. GOLL',
@@ -26,7 +26,7 @@ export const About: React.FC = () => {
       name: 'CHARLENE H. DAGOSEH-SUAH, MPH, MS',
       role: 'Director, Environmental Health, WASH & Social Safeguards',
       bio: ' Charlene H. Dagoseh-Suah, MPH, MS is a Public Health, Epidemiology, Sanitation and WASH professional with multidisciplinary training in biology, public health, sanitation, and gender-responsive development planning.',
-      image: 'https://images.unsplash.com/photo-1788120501436-f3bfd8638984?q=80&w=2244&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      image: 'https://images.unsplash.com/photo-1788121167117-5ccd4d3b2287?q=80&w=2244&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     },
   ];
 
