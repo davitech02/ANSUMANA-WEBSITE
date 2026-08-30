@@ -5,22 +5,28 @@ import { ShieldCheck, Award, Users, Target, CheckCircle2, PhoneCall, ArrowRight,
 export const About: React.FC = () => {
   const leadership = [
     {
-      name: 'Dr. Ansumana Kamara',
-      role: 'Founder & Principal Environmental Specialist',
-      bio: 'Ph.D. in Environmental Engineering with over 18 years of advisory experience with EPA Liberia, mining conglomerates, and international infrastructure projects.',
+      name: 'Mr. Charles S. Dagoseh Sr.',
+      role: 'CEO- Ansumana Environmental Consultancy Inc. Mining Engineer | Rock Mechanics Specialist | EPA-Accredited Environmental Consultant',
+      bio: 'A Mining Engineer, Rock Mechanics Specialist, and Environmental Consultant with over 22 years of practical and professional experience in the mining, environmental, and natural resources sectors.He earned his Bachelor of Science degree from the University of Liberia in 1980 and obtained professional training and certification from the Colorado School of Mines, USA, in 1979. His career includes senior service within Liberia\'s mining administration, including his tenure as Senior Director of Mines at the Ministry of Lands, Mines and Energy, where he contributed to mining regulation, technical oversight, and mineral resource administration. His expertise covers mining operations, rock mechanics, mineral resource development, environmental assessment, mine-related environmental management, regulatory compliance, and technical advisory services.',
       image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
     },
     {
-      name: 'Ing. Mohamed Bangura',
-      role: 'Lead EIA & Mining Compliance Engineer',
-      bio: 'Former EPA Senior Inspector specializing in mine tailings management, effluent discharge analysis, and ESIA environmental management plans.',
+      name: 'Charles S. Dagoseh Jr.',
+      role: 'General Manager Environmental Consultant | ESIA Evaluator, BBA In Management | M.Sc. Candidate in Environmental Science',
+      bio: 'A Certified Environmental Consultant and ESIA Evaluator with 8 years of practical experience in environmental assessment, environmental auditing, compliance monitoring, environmental management planning, field inspections, regulatory reporting, and environmental permitting support.He holds a Bachelor of Business Administration in Management and is currently pursuing an M.Sc. in Environmental Science at Cuttington University. His professional background bridges environmental practice with management expertise, enabling him to coordinate environmental assignments, assess project impacts, prepare environmental reports, guide clients through EPA regulatory requirements, and manage environmental compliance activities across diverse sectors.His practical experience spans mining, construction, industrial facilities, cold storage operations, fuel service stations, manufacturing facilities, and other development projects requiring environmental assessment and regulatory compliance.',
       image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
     },
     {
-      name: 'Fatu Jalloh-Sankoh',
-      role: 'Head of Monitoring & Field GIS Analytics',
-      bio: 'Expert in satellite spatial mapping, water quality sampling, and biodiversity impact monitoring across Liberia coastal and inland ecosystems.',
+      name: 'CLLR. URIAS S. GOLL',
+      role: 'Director, Legal & Environmental Affairs, Counsellor-at-Law | Environmental & Natural Resources Specialist',
+      bio: ' a Liberian lawyer, environmental specialist, and natural resources management practitioner with over 18 years of professional experience spanning environmental and natural resources law, environmental policy, regulatory compliance, project management, conservation, sustainable resource management, and institutional governance.He holds a Bachelor of Science in Biology from the University of Liberia, a Master\'s Degree in Environmental Economics and Management from the University of York, United Kingdom, and an LLB (Hons) from the Louis Arthur Grimes School of Law, University of Liberia. This multidisciplinary background places his practice at the intersection of law, environmental science, economics, and natural resources management.',
       image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
+    },
+    {
+      name: 'CHARLENE H. DAGOSEH-SUAH, MPH, MS',
+      role: 'Director, Environmental Health, WASH & Social Safeguards',
+      bio: ' Charlene H. Dagoseh-Suah, MPH, MS is a Public Health, Epidemiology, Sanitation and WASH professional with multidisciplinary training in biology, public health, sanitation, and gender-responsive development planning.She holds a Masters degree in Sanitation from IHE Delft Institute for Water Education, The Netherlands, a graduate degree in Public Health with emphasis in Epidemiology from Cuttington Graduate School, and a B.Sc. in Biology from the University of Liberia. She also holds professional certification in Gender Planning in Development from the Asian Institute of Technology, Bangkok, Thailand.',
+      image: 'https://imgur.com/a/A3x5m8H',
     },
   ];
 
